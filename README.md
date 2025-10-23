@@ -7,14 +7,14 @@
 ## 📁 Repository Overview
 
 This repository contains:
-
+```
 automated-decapper/
 ├── main/
 │ └── decapper.ino # Main Arduino sketch
 ├── docs/
 │ └── wiring-diagram.png # Hardware wiring overview
 └── README.md
-
+```
 
 ---
 
