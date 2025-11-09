@@ -19,7 +19,7 @@
 
 // ====== Heights and Distances ======
 long linear_home = 0;            // Home reference
-long screwcap_height = -2000;    // Calibrated screw cap engagement height
+long screwcap_height = -1000;    // Calibrated screw cap engagement height
 long snaplink_height = -1500;    // Calibrated snap cap engagement height
 long unscrew_lift_distance = 1500; // Distance to lift while unscrewing
 long final_lift_distance = 3000; // Final lift after opening
