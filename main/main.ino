@@ -16,6 +16,7 @@
 #define ROT_ACCEL 300
 #define LIN_MAX_SPEED 800
 #define LIN_ACCEL 400
+serial.println("im inside boyssssss");
 
 // ====== Heights and Distances ======
 long linear_home = 0;            // Home reference
