@@ -14,7 +14,7 @@
 // ====== Motor Settings ======
 #define ROT_MAX_SPEED 600
 #define ROT_ACCEL 300
-#define LIN_MAX_SPEED 80
+#define LIN_MAX_SPEED 800
 #define LIN_ACCEL 400
 
 // ====== Heights and Distances ======
