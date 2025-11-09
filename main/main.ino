@@ -25,7 +25,7 @@ long unscrew_lift_distance = 1500; // Distance to lift while unscrewing
 long final_lift_distance = 3000; // Final lift after opening
 
 // ====== Servo Angles ======
-int CLAW_OPEN = 60;
+int CLAW_OPEN = 70;
 int CLAW_CLOSE = 120;
 
 // ====== State Variables ======
