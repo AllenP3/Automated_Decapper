@@ -1,173 +1,106 @@
+// =======================================================
+// Continuous Parallel Motion (Final - Stepper1 = Rotation)
+// Servo + 2x 28BYJ + Linear Actuator (TMC2209)
+// Allen | Nov 2025
+// =======================================================
+
 #include <Servo.h>
-#include <AccelStepper.h>
 
-// ====== Pin Definitions ======
-#define SERVO_PIN 9
-#define ROT_STEP_PIN 2
-#define ROT_DIR_PIN 3
-#define LIN_STEP_PIN 4
-#define LIN_DIR_PIN 5
-#define HALL_PIN 6
-#define MODE_PIN 7   // Toggle button (Snaplink/Screwcap)
-#define ENABLE_PIN 8 // Optional enable pin for both steppers
+// ---------- Pin setup ----------
+int rotPins[4] = {2, 3, 4, 5};     // Stepper 1 = Rotation
+int finePins[4] = {6, 7, 8, 9};    // Stepper 2 = Fine adjustment
+#define SERVO_PIN 13
+#define EN_PIN   10
+#define STEP_PIN 11
+#define DIR_PIN  12
 
-// ====== Motor Settings ======
-#define ROT_MAX_SPEED 600
-#define ROT_ACCEL 300
-#define LIN_MAX_SPEED 800
-#define LIN_ACCEL 400
-serial.println("im inside boyssssss");
+// ---------- Motion tuning ----------
+int servoOpen = 150;        // Servo open angle
+int servoClose = 80;        // Servo close angle
+int servoInterval = 1500;   // ms between open/close
 
-// ====== Heights and Distances ======
-long linear_home = 0;            // Home reference
-long screwcap_height = -2000;    // Calibrated screw cap engagement height
-long snaplink_height = -1500;    // Calibrated snap cap engagement height
-long unscrew_lift_distance = 1500; // Distance to lift while unscrewing
-long final_lift_distance = 3000; // Final lift after opening
+int rotLimit = 4048;        // Stepper1 rotation range (≈180°)
+int fineLimit = 4000;        // Stepper2 fine oscillation range
+int rotDelay = 1;           // smaller = faster (ms per microstep)
+int fineDelay = 1;
 
-// ====== Servo Angles ======
-int CLAW_OPEN = 60;
-int CLAW_CLOSE = 120;
+float stepsPerMM = 600;     // actuator calibration
+float distanceMM = 50;      // stroke each way
+int actDelayMicros = 200;   // µs between actuator steps
 
-// ====== State Variables ======
+// ---------- Internal state ----------
+unsigned long lastServoTime = 0;
+bool servoState = false;
 Servo claw;
-AccelStepper rotStepper(AccelStepper::DRIVER, ROT_STEP_PIN, ROT_DIR_PIN);
-AccelStepper linStepper(AccelStepper::DRIVER, LIN_STEP_PIN, LIN_DIR_PIN);
 
-bool screwMode = false;
+int seq[8][4] = {
+  {1,0,0,0}, {1,1,0,0}, {0,1,0,0}, {0,1,1,0},
+  {0,0,1,0}, {0,0,1,1}, {0,0,0,1}, {1,0,0,1}
+};
 
-// ============================================================
-// ===================== SETUP ================================
-// ============================================================
+int rotIdx=0, fineIdx=0;
+int rotDir=1, fineDir=1;
+int rotCount=0, fineCount=0;
+
+bool actDir=true;
+long actSteps=0, actTotal;
+unsigned long lastRot=0, lastFine=0, lastAct=0;
+
+// ---------- Setup ----------
 void setup() {
-  Serial.begin(115200);
-
-  pinMode(HALL_PIN, INPUT_PULLUP);
-  pinMode(MODE_PIN, INPUT_PULLUP);
-  pinMode(ENABLE_PIN, OUTPUT);
-  digitalWrite(ENABLE_PIN, LOW); // Enable motors (active low depending on driver)
+  Serial.begin(9600);
+  for (int i=0;i<4;i++){ pinMode(rotPins[i],OUTPUT); pinMode(finePins[i],OUTPUT); }
 
   claw.attach(SERVO_PIN);
-  claw.write(CLAW_OPEN);
+  claw.write(servoClose);
 
-  rotStepper.setMaxSpeed(ROT_MAX_SPEED);
-  rotStepper.setAcceleration(ROT_ACCEL);
+  pinMode(EN_PIN,OUTPUT); pinMode(STEP_PIN,OUTPUT); pinMode(DIR_PIN,OUTPUT);
+  digitalWrite(EN_PIN,LOW); // enable TMC2209
+  actTotal = distanceMM * stepsPerMM;
 
-  linStepper.setMaxSpeed(LIN_MAX_SPEED);
-  linStepper.setAcceleration(LIN_ACCEL);
-
-  Serial.println("=== Decapper System Initializing ===");
-
-  // Perform initial homing
-  homeAll();
-
-  Serial.println("System Ready. Waiting for toggle or command...");
+  Serial.println("Parallel Motion Running ✅");
 }
 
-// ============================================================
-// ===================== LOOP ================================
-// ============================================================
+// ---------- Loop ----------
 void loop() {
-  // Read mode from toggle
-  screwMode = digitalRead(MODE_PIN) == HIGH;
+  unsigned long now = millis();
 
-  if (screwMode) {
-    Serial.println("Mode: Screwcap");
-    performScrewcapRoutine();
-  } else {
-    Serial.println("Mode: Snaplink");
-    performSnaplinkRoutine();
+  // --- Servo ---
+  if (now - lastServoTime > servoInterval) {
+    servoState = !servoState;
+    claw.write(servoState ? servoOpen : servoClose);
+    lastServoTime = now;
   }
 
-  delay(5000); // Wait before repeating for testing
+  // --- Stepper1: Rotation ---
+  if (now - lastRot > rotDelay) {
+    rotIdx += rotDir; if (rotIdx>=8) rotIdx=0; if (rotIdx<0) rotIdx=7;
+    stepSeq(rotPins, rotIdx);
+    rotCount += rotDir;
+    if (abs(rotCount) >= rotLimit) { rotDir*=-1; rotCount=0; }
+    lastRot = now;
+  }
+
+  // --- Stepper2: Fine adjustment ---
+  if (now - lastFine > fineDelay) {
+    fineIdx += fineDir; if (fineIdx>=8) fineIdx=0; if (fineIdx<0) fineIdx=7;
+    stepSeq(finePins, fineIdx);
+    fineCount += fineDir;
+    if (abs(fineCount) >= fineLimit) { fineDir*=-1; fineCount=0; }
+    lastFine = now;
+  }
+
+  // --- Linear actuator ---
+  if (micros() - lastAct > actDelayMicros) {
+    digitalWrite(DIR_PIN, actDir ? HIGH : LOW);
+    digitalWrite(STEP_PIN, HIGH); delayMicroseconds(2); digitalWrite(STEP_PIN, LOW);
+    actSteps++;
+    if (actSteps >= actTotal) { actSteps=0; actDir=!actDir; }
+    lastAct = micros();
+  }
 }
 
-// ============================================================
-// ===================== FUNCTIONS ============================
-// ============================================================
-
-void homeAll() {
-  Serial.println("Homing linear actuator...");
-  linStepper.moveTo(10000); // Move up until limit (simulate)
-  while (digitalRead(HALL_PIN) == HIGH) {
-    linStepper.runSpeed();
-    linStepper.setSpeed(400);
-  }
-  linStepper.stop();
-  linStepper.setCurrentPosition(linear_home);
-
-  Serial.println("Homing rotation...");
-  while (digitalRead(HALL_PIN) == HIGH) {
-    rotStepper.setSpeed(-300);
-    rotStepper.runSpeed();
-  }
-  rotStepper.stop();
-  rotStepper.setCurrentPosition(0);
-
-  Serial.println("Homing complete.");
-  claw.write(CLAW_OPEN);
-}
-
-// ========== Screw Cap Routine ==========
-void performScrewcapRoutine() {
-  Serial.println("Starting Screwcap Routine...");
-
-  // 1. Go down to screwcap height
-  moveLinearTo(screwcap_height);
-
-  // 2. Close claw
-  claw.write(CLAW_CLOSE);
-  delay(1000);
-
-  // 3. Unscrew while lifting
-  long liftTarget = linStepper.currentPosition() + unscrew_lift_distance;
-  for (int i = 0; i < 400; i++) { // number of steps for unscrewing
-    rotStepper.moveTo(rotStepper.currentPosition() + 200);
-    rotStepper.run();
-    linStepper.moveTo(liftTarget);
-    linStepper.run();
-  }
-
-  // 4. Final lift up
-  moveLinearTo(linear_home + final_lift_distance);
-
-  Serial.println("Screwcap unscrewing complete.");
-  claw.write(CLAW_OPEN);
-  delay(1000);
-  homeAll();
-}
-
-// ========== Snaplink Routine ==========
-void performSnaplinkRoutine() {
-  Serial.println("Starting Snaplink Routine...");
-
-  // 1. Move down
-  moveLinearTo(snaplink_height);
-
-  // 2. Close claw
-  claw.write(CLAW_CLOSE);
-  delay(1000);
-
-  // 3. Rotate full turn to snap open
-  long snapRotation = rotStepper.currentPosition() + 800; // one full rev (adjust)
-  rotStepper.moveTo(snapRotation);
-  while (rotStepper.distanceToGo() != 0) {
-    rotStepper.run();
-  }
-
-  // 4. Lift back up
-  moveLinearTo(linear_home + final_lift_distance);
-
-  Serial.println("Snaplink decap complete.");
-  claw.write(CLAW_OPEN);
-  delay(1000);
-  homeAll();
-}
-
-// ========== Helper Function ==========
-void moveLinearTo(long targetPos) {
-  linStepper.moveTo(targetPos);
-  while (linStepper.distanceToGo() != 0) {
-    linStepper.run();
-  }
+// ---------- Step driver ----------
+void stepSeq(int p[4], int idx){
+  for (int i=0;i<4;i++) digitalWrite(p[i], seq[idx][i]);
 }
