@@ -1,222 +1,388 @@
-# 🧪 Automated Test Tube Decapper
-
-> A low-cost Arduino-based system to automatically open laboratory test tubes (snap-link and screw-cap types) using servo and stepper actuation.
 
 ---
 
-## 📁 Repository Overview
+# 📦 Decapper Control System (Arduino MEGA)
 
-This repository contains:
-```
-automated-decapper/
-├── main/
-│ └── decapper.ino # Main Arduino sketch
-├── docs/
-│ └── wiring-diagram.png # Hardware wiring overview
-└── README.md
-```
+*A modular multi-axis robotic decapper with screw-cap and snaplink capabilities.*
 
 ---
 
-## 🧠 Project Description
+## 🔧 Features
 
-This project automates the process of removing both **snap-link** and **screw-type** caps from laboratory sample tubes.  
-It integrates:
-- A **servo-driven claw** for gripping caps  
-- A **rotational stepper** for twisting motion  
-- A **linear stepper actuator** for vertical motion  
-- A **hall-effect sensor** for homing calibration  
-- A **toggle switch** to select between cap types  
-
----
-
-## 🧰 Bill of Materials (BOM)
-
-| Component                      | Qty | Description |
-|--------------------------------|-----|-------------|
-| Arduino Uno (ATmega328P)       | 1 | Main controller |
-| Stepper Motor 28BYJ            | 2 | One for rotation, one for linear actuator |
-| Stepper Driver A4988 / DRV8825 | 2 | Current-limited drivers |
-| Servo Motor (e.g. MG996R)      | 1 | Controls claw open/close |
-| Hall Effect Sensor             | 1 | Detects home position |
-| Toggle Switch                  | 1 | Selects Snaplink / Screwcap mode |
-| 12 V 4 A Power Supply          | 1 | Main power input |
-| LM2596 Buck Converter          | 1 | Steps 12 V → 5 V for logic + servo |
-| Wires, Breadboard / PCB        | — | As required |
+* Linear actuator (TMC2209)
+* Rail stepper (28BYJ-48 + ULN2003)
+* Claw rotation stepper (28BYJ-48 + ULN2003)
+* Servo claw (MG996R)
+* Limit switches + Hall sensor for homing
+* Hardware control panel
+* Mode-based execution system
+* Fully modular class-based C++ design
+* Extendable routines
 
 ---
 
-## 🧱 Hardware Pin Mapping
+## 📁 Project Structure
 
-| Function | Arduino Pin |
-|-----------|--------------|
-| Servo Signal | D9 |
-| Rotation Stepper STEP | D2 |
-| Rotation Stepper DIR | D3 |
-| Linear Stepper STEP | D4 |
-| Linear Stepper DIR | D5 |
-| Hall Sensor Input | D6 |
-| Mode Toggle Input | D7 |
-| Stepper Enable (optional) | D8 |
-| 5 V / GND | Shared with servo and sensors |
+> **Important:** Arduino IDE requires *all files in the same folder*.
 
----
-
-## ⚡ Power Wiring
 ```
-[12 V 4 A Adapter]
-│
-├──> [Stepper Drivers] → Steppers (Rotation + Linear)
-└──> [LM2596 Buck Converter → 5 V 3 A]
-├──> Arduino Nano
-├──> Servo Motor
-└──> Hall Sensor + Toggle
-```
-```
-⚠️ All GNDs must be connected together.
-⚠️ Never power the servo directly from the Nano’s 5 V pin.
+src/
+├─ main/
+    │  main.ino
+    │
+    ├─ PanelIO.h
+    ├─ PanelIO.cpp
+    │
+    ├─ LinearActuator.h
+    ├─ LinearActuator.cpp
+    │
+    ├─ RailStepper.h
+    ├─ RailStepper.cpp
+    │
+    ├─ ClawStepper.h
+    ├─ ClawStepper.cpp
+    │
+    ├─ ServoClaw.h
+    ├─ ServoClaw.cpp
+    │
+    ├─ Calibration.h
+    ├─ Calibration.cpp
+    │
+    ├─ ScrewRoutine.h
+    ├─ ScrewRoutine.cpp
+    │
+    ├─ SnaplinkRoutine.h
+    └─ SnaplinkRoutine.cpp
 ```
 
 ---
 
-## 🧩 Software Setup
+## 🎮 Control Panel Overview
 
-### 1️⃣ Install Arduino IDE
+### **3-Way Mode Switch**
 
-Download from [https://www.arduino.cc/en/software](https://www.arduino.cc/en/software)  
-and install for your OS (Windows / macOS / Linux).
+| Position | Description           |
+| -------- | --------------------- |
+| OFF      | System disabled       |
+| SNAPLINK | Run snaplink routine  |
+| SCREW    | Run screw-cap routine |
 
-### 2️⃣ Install Libraries
+### **2-Way Function Switch**
 
-Go to **Sketch → Include Library → Manage Libraries**  
-Search and install:
-- **AccelStepper** (by Mike McCauley)
-- **Servo** (by Arduino)
+| Position  | Description        |
+| --------- | ------------------ |
+| CALIBRATE | Homes all motors   |
+| EXECUTE   | Runs selected mode |
 
-### 3️⃣ Connect Board
+### **Buttons**
 
-- Plug in your **Arduino Nano** via USB.  
-- If it’s a clone, install the **CH340 driver** (Google “CH340 Arduino driver” for your OS).
-
-### 4️⃣ Select Board and Port
-
-In the IDE:
-
-Tools → Board → Arduino Nano
-Tools → Processor → ATmega328P (Old Bootloader)
-Tools → Port → [Your COM Port]
-
+| Button | Action                      |
+| ------ | --------------------------- |
+| START  | Begin action / calibration  |
+| STOP   | Immediately halt all motors |
 
 ---
 
-## 🧑‍💻 GitHub Setup (for your team)
+## 🧠 System Workflow
 
-### Step 1: Clone repository
-
-Run this in a terminal:
-```bash
-git clone https://github.com/<your-username>/automated-decapper.git
-cd automated-decapper
 ```
-### Step 2: Add your Arduino sketch
-
-Please ensure you are working on the dev branch, instead of the main.
-Make changes to the files into a folder named main:
-```
-automated-decapper/
-└── main/
-    └── main.ino
-```
-### Step 3: Push changes to GitHub
-```
-git add .
-git commit -m "feat: initial decapper firmware and documentation"
-git push origin main
-```
-### 🧠 Running the Firmware
-```
-=== Decapper System Initializing ===
-Homing linear actuator...
-Homing rotation...
-System Ready.
-Mode: Screwcap
-Starting Screwcap Routine...
-Screwcap unscrewing complete.
+[Select Mode]
+      ↓
+[Select Function]
+      ↓
+   Press START
+      ↓
+-------------------------
+| CALIBRATE → Home all |
+| EXECUTE   → Run mode |
+-------------------------
+      ↓
+ Press STOP anytime
 ```
 
-### 🔧 Calibration Parameters
-| Variable                  | Purpose                               |
-| ------------------------- | ------------------------------------- |
-| `screwcap_height`         | Z-height for screw cap engagement     |
-| `snaplink_height`         | Z-height for snap cap engagement      |
-| `unscrew_lift_distance`   | Distance claw lifts while unscrewing  |
-| `final_lift_distance`     | Retraction distance after cap removal |
-| `CLAW_OPEN`, `CLAW_CLOSE` | Servo angles for open/close           |
+---
 
-Tune these experimentally using Serial.print() readings.
+# 🔌 Hardware Components
 
-### 💡 Operating Sequence
-🧷 Screw-Cap Mode
+### Motors
 
-    Claw opens
+| Component       | Driver  | Notes               |
+| --------------- | ------- | ------------------- |
+| Linear Actuator | TMC2209 | Limit switch homing |
+| Rail Stepper    | ULN2003 | Full-step sequence  |
+| Claw Stepper    | ULN2003 | Hall effect homing  |
+| Servo Claw      | MG996R  | Smooth open/close   |
 
-    Moves down to screwcap height
+### Inputs
 
-    Claw closes
+* Mode switch (3-way)
+* Function switch (2-way)
+* START button
+* STOP button
+* Linear actuator limit switch
+* Rail limit switch
+* Claw hall sensor
 
-    Rotates + lifts simultaneously to unscrew
+---
 
-    Lifts clear, releases cap, returns home
+# 🛠 Code Modules
 
-⚙️ Snap-Link Mode
+Each component has its own `.h/.cpp` pair for clean modularity.
 
-    Claw opens
+---
 
-    Moves down to snaplink height
+## **1. PanelIO**
 
-    Claw closes
+Handles:
 
-    Performs one full rotation (to snap)
+* Reading hardware switches
+* Debouncing
+* Mode/function determination
+* START/STOP logic
 
-    Lifts clear, releases cap, returns home
+File:
 
-### 🔋 Power Guidelines
-| Rail             | Voltage | Continuous Current | Notes                    |
-| ---------------- | ------- | ------------------ | ------------------------ |
-| **Steppers**     | 12 V    | 3 A total          | Shared 12 V 4 A adapter  |
-| **Servo + Nano** | 5 V     | 2–3 A              | Buck-converted from 12 V |
-| **Total**        | —       | ~4 A               | ≈ 50 W total system draw |
-
-### 🧩 Repository Usage Summary
-| Command                     | Description                     |
-| --------------------------- | ------------------------------- |
-| `git clone <repo>`          | Clone the project               |
-| `git add .`                 | Stage all new or modified files |
-| `git commit -m "<message>"` | Save changes locally            |
-| `git push`                  | Upload to GitHub                |
-| `git pull`                  | Get the latest updates          |
-
-🧱 Suggested Directory Structure
 ```
-automated-decapper/
-├── src/
-│   └── decapper.ino
-├── docs/
-│   ├── wiring-diagram.png
-│   └── calibration-table.md
-├── LICENSE
-└── README.md
+PanelIO.h / PanelIO.cpp
 ```
-### 📜 License
 
-Released under the MIT License — see LICENSE.
-👤 Author
+---
+
+## **2. LinearActuator**
+
+Features:
+
+* TMC2209 step/direction control
+* Homing with limit switch
+* Soft limits
+* Absolute & relative movement
+* Configurable speed
+
+File:
+
 ```
-Allen Prasad
-Mechatronics B.Eng., THWS Würzburg-Schweinfurt
-Supervisor: Prof. Dr. Lisa Kiesewetter
-Industrial Project Topic 4 — Automated Decapping of Sample Tubes
+LinearActuator.h / LinearActuator.cpp
 ```
-    🧠 Tip: For reproducible setups, tag your releases using
-    git tag -a v1.0.0 -m "first working prototype"
-    git push origin v1.0.0
+
+---
+
+## **3. RailStepper**
+
+Features:
+
+* Homing using limit switch
+* Full-step sequence
+* Adjustable movement speed
+
+File:
+
+```
+RailStepper.h / RailStepper.cpp
+```
+
+---
+
+## **4. ClawStepper**
+
+Features:
+
+* Hall effect homing
+* Degree-based rotation
+* Smooth step sequencing
+
+File:
+
+```
+ClawStepper.h / ClawStepper.cpp
+```
+
+---
+
+## **5. ServoClaw**
+
+Features:
+
+* Smooth open/close
+* Tunable speed
+* Adjustable grip angles
+
+File:
+
+```
+ServoClaw.h / ServoClaw.cpp
+```
+
+---
+
+## **6. Calibration Routine**
+
+Homes all axes:
+
+* Linear actuator
+* Rail stepper
+* Claw stepper
+
+File:
+
+```
+Calibration.h / Calibration.cpp
+```
+
+---
+
+## **7. ScrewRoutine**
+
+Sequence:
+
+1. Open claw
+2. Lower to cap
+3. Grip
+4. Break torque
+5. Rotate while lifting
+6. Final lift
+7. Hold cap securely
+
+File:
+
+```
+ScrewRoutine.h / ScrewRoutine.cpp
+```
+
+---
+
+## **8. SnaplinkRoutine**
+
+Sequence:
+
+1. Open claw
+2. Lower
+3. Partial grip
+4. Align with small rotation
+5. Quick upward “snap” motion
+6. Reset
+
+File:
+
+```
+SnaplinkRoutine.h / SnaplinkRoutine.cpp
+```
+
+---
+
+# 📌 Tuning Parameters
+
+### Linear Actuator
+
+* steps/mm
+* max/min travel
+* speed (microsecond delay)
+
+### Rail Stepper
+
+* stepDelay
+* direction
+* homing logic
+
+### Claw Stepper
+
+* degreesPerStep
+* rotation speed
+
+### Servo
+
+* open angle
+* close angle
+
+### Routines
+
+* movement distances
+* timing
+* grip strengths
+* rotational amounts
+
+---
+
+# 🧪 Testing Instructions
+
+### Test Motors Individually
+
+```cpp
+lin.moveRelative(5);
+rail.moveSteps(200);
+claw.rotateDegrees(120);
+servo.open(150);
+```
+
+### Test Calibration
+
+1. Set function → **CALIBRATE**
+2. Press **START**
+
+### Test Action Modes
+
+1. Set mode → SNAPLINK or SCREW
+2. Set function → EXECUTE
+3. Press START
+
+### Emergency Stop
+
+STOP button must interrupt motion at all times.
+
+---
+
+# ⚠️ Safety Notes
+
+* Always perform homing before running routines.
+* STOP immediately disables all motors.
+* Use proper current limit on TMC2209.
+* Never operate without end-stops connected.
+* Keep hands away from rotating axes.
+
+---
+
+# 🧱 How to Add a New Routine
+
+1. Create two new files:
+
+```
+MyRoutine.h
+MyRoutine.cpp
+```
+
+2. Forward declare dependencies in `.h`:
+
+```cpp
+class LinearActuator;
+class RailStepper;
+class ClawStepper;
+class ServoClaw;
+```
+
+3. Implement logic in `.cpp`.
+
+4. Register in `Decapper.ino`:
+
+```cpp
+if (panel.mode() == PanelIO::MODE_MYMODE) {
+    MyRoutine::run(lin, rail, claw, servo);
+}
+```
+
+---
+
+# 👥 Team Roles (Recommended)
+
+| Person     | Role                            |
+| ---------- | ------------------------------- |
+|  A | Motor tuning & homing           |
+|  B | Screw & Snaplink logic          |
+|  C | PanelIO & main control          |
+|  D | Wiring, connectors, control box |
+
+---
+
+# 📜 License
+
+MIT License — free to modify, use, and extend.
+
+---
