@@ -14,9 +14,7 @@ void PanelIO::init(uint8_t mA, uint8_t mB, uint8_t funcPin, uint8_t startPin, ui
   pinMode(stop_pin, INPUT_PULLUP);
 }
 
-void PanelIO::update() {
-  // no debounce yet (can add later)
-}
+void PanelIO::update() {}
 
 PanelIO::Mode PanelIO::mode() {
   bool a = digitalRead(modeA_pin);

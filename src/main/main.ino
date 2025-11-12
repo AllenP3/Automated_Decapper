@@ -1,12 +1,12 @@
-#include <Arduino.h>
-#include "../io/PanelIO.h"
-#include "../motors/LinearActuator.h"
-#include "../motors/RailStepper.h"
-#include "../motors/ClawStepper.h"
-#include "../motors/ServoClaw.h"
-#include "../routines/Calibration.h"
-#include "../routines/ScrewRoutine.h"
-#include "../routines/SnaplinkRoutine.h"
+#include "PanelIO.h"
+#include "LinearActuator.h"
+#include "RailStepper.h"
+#include "ClawStepper.h"
+#include "ServoClaw.h"
+#include "Calibration.h"
+#include "ScrewRoutine.h"
+#include "SnaplinkRoutine.h"
+
 
 // Global objects
 PanelIO panel;

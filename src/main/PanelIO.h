@@ -8,7 +8,7 @@ public:
 
   void init(uint8_t mA, uint8_t mB, uint8_t funcPin, uint8_t startPin, uint8_t stopPin);
   void update();
-  
+
   Mode mode();
   Function function();
 
@@ -17,6 +17,7 @@ public:
 
 private:
   uint8_t modeA_pin, modeB_pin, func_pin, start_pin, stop_pin;
+
   bool lastStart = HIGH;
   bool lastStop = HIGH;
 };
