@@ -1,3 +1,4 @@
+// MachineState.cpp
 #include "MachineState.h"
 
 bool MachineState::running     = false;
