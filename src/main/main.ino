@@ -6,24 +6,23 @@
 #include "Calibration.h"
 #include "ScrewRoutine.h"
 #include "SnaplinkRoutine.h"
-
+#include "MachineState.h"
 
 // Global objects
-PanelIO panel;
+PanelIO      panel;
 LinearActuator lin;
-RailStepper rail;
-ClawStepper claw;
-ServoClaw servo;
-
-bool running = false;
+RailStepper    rail;
+ClawStepper    claw;
+ServoClaw      servo;
 
 void setup() {
   Serial.begin(115200);
+  MachineState::init();
 
-  // UI panel
-  panel.init(24, 25, 26, 27, 28);  // modeA, modeB, func, start, stop
+  // UI: joystick X=A0, Y=A1, SW=4, START=2, STOP=3
+  panel.init(A0, A1, 4, 2, 3);
 
-  // Motor initialisation
+  // Motor initialisation (same as before)
   lin.init(11, 12, 10);            // step, dir, en
   rail.init(2, 3, 4, 5, 22);       // in1–4, limit switch
   claw.init(6, 7, 8, 9, 23);       // in1–4, hall sensor
@@ -31,32 +30,58 @@ void setup() {
 }
 
 void loop() {
-  panel.update();
+  panel.update();   // read joystick, refresh OLED idle screen
 
+  // STOP button -> stop motors, mark homing required
   if (panel.stopPressed()) {
     lin.stop();
     rail.stop();
     claw.stop();
-    running = false;
+    MachineState::running     = false;
+    MachineState::needsHoming = true;
+    panel.showIdleScreen();
   }
 
-  if (panel.startPressed() && !running) {
-    running = true;
+  // START button
+  if (panel.startPressed() && !MachineState::running) {
+    PanelIO::Mode m = panel.mode();
 
-    if (panel.mode() == PanelIO::MODE_OFF) {
-      Serial.println("System is OFF. Ignoring START.");
-      running = false;
+    // INFO mode: just show counters
+    if (m == PanelIO::MODE_INFO) {
+      panel.showInfoScreen();
+      delay(2000);
+      panel.showIdleScreen();
+      return;
     }
-    else if (panel.function() == PanelIO::FUNC_CALIBRATE) {
+
+    // SNAP / SCREW blocked when homing is required
+    if (MachineState::needsHoming &&
+        (m == PanelIO::MODE_SNAP || m == PanelIO::MODE_SCREW)) {
+      panel.showNeedsHoming();
+      delay(1500);
+      panel.showIdleScreen();
+      return;
+    }
+
+    MachineState::running = true;
+
+    if (m == PanelIO::MODE_HOME) {
+      // homing / calibration
       Calibration::runAll(lin, rail, claw);
+      MachineState::needsHoming = false;
     }
-    else if (panel.function() == PanelIO::FUNC_EXECUTE) {
-      if (panel.mode() == PanelIO::MODE_SCREW)
-        ScrewRoutine::run(lin, rail, claw, servo);
-      else if (panel.mode() == PanelIO::MODE_SNAP)
-        SnaplinkRoutine::run(lin, rail, claw, servo);
+    else if (m == PanelIO::MODE_SNAP) {
+      SnaplinkRoutine::run(lin, rail, claw, servo);
+      MachineState::snapCount++;      // count successful SNAP
+      MachineState::needsHoming = false;  // assumes routine includes homing
+    }
+    else if (m == PanelIO::MODE_SCREW) {
+      ScrewRoutine::run(lin, rail, claw, servo);
+      MachineState::screwCount++;     // count successful SCREW
+      MachineState::needsHoming = false;
     }
 
-    running = false;
+    MachineState::running = false;
+    panel.showIdleScreen();
   }
 }
