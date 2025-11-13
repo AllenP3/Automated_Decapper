@@ -1,3 +1,4 @@
+// main.ino
 #include "PanelIO.h"
 #include "LinearActuator.h"
 #include "RailStepper.h"
@@ -9,7 +10,7 @@
 #include "MachineState.h"
 
 // Global objects
-PanelIO      panel;
+PanelIO        panel;
 LinearActuator lin;
 RailStepper    rail;
 ClawStepper    claw;
@@ -19,10 +20,10 @@ void setup() {
   Serial.begin(115200);
   MachineState::init();
 
-  // UI: joystick X=A0, Y=A1, SW=4, START=2, STOP=3
+  // joystick X=A0, Y=A1, SW=4, START=2, STOP=3 (change if wired differently)
   panel.init(A0, A1, 4, 2, 3);
 
-  // Motor initialisation (same as before)
+  // Motor initialisation (same as your old code)
   lin.init(11, 12, 10);            // step, dir, en
   rail.init(2, 3, 4, 5, 22);       // in1–4, limit switch
   claw.init(6, 7, 8, 9, 23);       // in1–4, hall sensor
@@ -30,9 +31,9 @@ void setup() {
 }
 
 void loop() {
-  panel.update();   // read joystick, refresh OLED idle screen
+  panel.update();   // read joystick, update OLED if mode changed
 
-  // STOP button -> stop motors, mark homing required
+  // STOP button: stop everything, require homing
   if (panel.stopPressed()) {
     lin.stop();
     rail.stop();
@@ -54,34 +55,29 @@ void loop() {
       return;
     }
 
-    // SNAP / SCREW blocked when homing is required
+    // SNAP / SCREW blocked if homing is required
     if (MachineState::needsHoming &&
-        (m == PanelIO::MODE_SNAP || m == PanelIO::MODE_SCREW)) {
+       (m == PanelIO::MODE_SNAP || m == PanelIO::MODE_SCREW)) {
       panel.showNeedsHoming();
       delay(1500);
       panel.showIdleScreen();
       return;
     }
 
-    MachineState::running = true;
-
     if (m == PanelIO::MODE_HOME) {
-      // homing / calibration
+      MachineState::running = true;
       Calibration::runAll(lin, rail, claw);
       MachineState::needsHoming = false;
+      MachineState::running = false;
+      panel.showIdleScreen();
     }
     else if (m == PanelIO::MODE_SNAP) {
       SnaplinkRoutine::run(lin, rail, claw, servo);
-      MachineState::snapCount++;      // count successful SNAP
-      MachineState::needsHoming = false;  // assumes routine includes homing
+      panel.showIdleScreen();
     }
     else if (m == PanelIO::MODE_SCREW) {
       ScrewRoutine::run(lin, rail, claw, servo);
-      MachineState::screwCount++;     // count successful SCREW
-      MachineState::needsHoming = false;
+      panel.showIdleScreen();
     }
-
-    MachineState::running = false;
-    panel.showIdleScreen();
   }
 }
