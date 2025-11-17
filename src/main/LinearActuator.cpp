@@ -1,82 +1,74 @@
 #include "LinearActuator.h"
 
-void LinearActuator::init(uint8_t stepPin, uint8_t dirPin, uint8_t enPin) {
-  STEP = stepPin;
-  DIR = dirPin;
-  EN = enPin;
+LinearActuator::LinearActuator()
+: driver(&uart, LIN_R_SENSE, LIN_DRIVER_ADDRESS),
+  stepper(AccelStepper::DRIVER, PIN_LIN_STEP, PIN_LIN_DIR)
+{}
 
-  pinMode(STEP, OUTPUT);
-  pinMode(DIR, OUTPUT);
-  pinMode(EN, OUTPUT);
+void LinearActuator::begin() {
 
-  digitalWrite(EN, LOW);
+    // Enable pin
+    pinMode(PIN_LIN_EN, OUTPUT);
+    digitalWrite(PIN_LIN_EN, LOW);  // ENABLE DRIVER
+
+    // Limit switch
+    pinMode(PIN_LIN_LIMIT, INPUT_PULLUP);
+
+    // UART begin
+    uart.begin(LIN_UART_BAUD);
+
+    // TMC setup
+    driver.begin();
+    driver.toff(5);
+    driver.rms_current(LIN_RMS_CURRENT);
+    driver.microsteps(LIN_MICROSTEPS);
+    driver.pwm_autoscale(true);
+
+    // Motion settings
+    stepper.setMaxSpeed(LIN_MAX_SPEED);
+    stepper.setAcceleration(LIN_ACCEL);
 }
 
-void LinearActuator::setSpeed(int microDelay) {
-  delayMicros = microDelay;
-}
-
-void LinearActuator::setStepsPerMM(float spmm) {
-  stepsPerMM = spmm;
-}
-
-void LinearActuator::setSoftLimits(float minMM, float maxMM) {
-  minPos = minMM;
-  maxPos = maxMM;
-}
-
-void LinearActuator::stepOnce(bool direction) {
-  digitalWrite(DIR, direction);
-  digitalWrite(STEP, HIGH);
-  delayMicroseconds(delayMicros);
-  digitalWrite(STEP, LOW);
-  delayMicroseconds(delayMicros);
-}
-
-void LinearActuator::home() {
-  Serial.println("[LinearActuator] Homing...");
-
-  while (digitalRead(22) == HIGH) { // limit switch active LOW
-    stepOnce(false);                // UP direction
-  }
-
-  // back off for sensor release
-  for (int i = 0; i < 80; i++) stepOnce(true);
-
-  positionMM = 0;
-  Serial.println("[LinearActuator] Homing complete.");
-}
-
-void LinearActuator::moveTo(float mm) {
-  moveRelative(mm - positionMM);
-}
-
-void LinearActuator::moveRelative(float mm) {
-  float target = positionMM + mm;
-
-  if (target < minPos) {
-    Serial.println("[LinearActuator] BLOCKED: Under minPos");
-    mm = minPos - positionMM;
-  }
-
-  if (target > maxPos) {
-    Serial.println("[LinearActuator] BLOCKED: Exceeds maxPos");
-    mm = maxPos - positionMM;
-  }
-
-  long steps = abs(mm) * stepsPerMM;
-  bool dir = (mm > 0);
-
-  for (long i = 0; i < steps; i++) {
-    stepOnce(dir);
-  }
-  positionMM += mm;
+void LinearActuator::update() {
+    stepper.run();
 }
 
 void LinearActuator::stop() {
-  digitalWrite(EN, HIGH);
+    stepper.stop();
 }
 
-float LinearActuator::getPosition() {
-  return positionMM;
+void LinearActuator::moveToMM(float mm) {
+    if (!homed) return;
+    long steps = mm / LIN_MM_PER_STEP;
+    stepper.moveTo(steps);
+}
+
+void LinearActuator::moveSteps(long s) {
+    if (!homed) return;
+    stepper.move(s);
+}
+
+void LinearActuator::moveToSteps(long s) {
+    if (!homed) return;
+    stepper.moveTo(s);
+}
+
+void LinearActuator::home() {
+
+    // Move upward until limit triggers
+    stepper.setSpeed(LIN_HOMING_SPEED);
+
+    while ( (limitActiveLow && digitalRead(PIN_LIN_LIMIT)) ||
+            (!limitActiveLow && !digitalRead(PIN_LIN_LIMIT)) )
+    {
+        stepper.runSpeed();
+    }
+
+    // Small retreat
+    stepper.move(-LIN_BACKOFF_STEPS);
+    while (isBusy()) stepper.run();
+
+    // Reset position
+    stepper.setCurrentPosition(0);
+    homed = true;
 }

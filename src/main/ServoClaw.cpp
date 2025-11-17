@@ -1,28 +1,51 @@
 #include "ServoClaw.h"
 
-void ServoClaw::init(uint8_t pwmPin) {
-  pin = pwmPin;
-  servo.attach(pin);
+ServoClaw::ServoClaw() {}
+
+void ServoClaw::begin() {
+    servo.attach(PIN_SERVO_CLAW);
+    currentAngle = SERVO_INITIAL_ANGLE;   // from Config.h
+    targetAngle  = currentAngle;
+    servo.write(currentAngle);
 }
 
-void ServoClaw::slowMove(float start, float end, int speed) {
-  if (start < end) {
-    for (int pos = start; pos <= end; pos++) {
-      servo.write(pos);
-      delay(speed);
-    }
-  } else {
-    for (int pos = start; pos >= end; pos--) {
-      servo.write(pos);
-      delay(speed);
-    }
-  }
+void ServoClaw::update() {
+    if (currentAngle == targetAngle) return;
+
+    unsigned long now = millis();
+    if (now - lastStepTime < moveInterval) return;
+
+    lastStepTime = now;
+
+    // Smooth movement towards target
+    if (currentAngle < targetAngle)
+        currentAngle += stepSize;
+    else
+        currentAngle -= stepSize;
+
+    // Clamp so we never overshoot
+    if (abs(currentAngle - targetAngle) < stepSize)
+        currentAngle = targetAngle;
+
+    servo.write(currentAngle);
 }
 
-void ServoClaw::open(float deg) {
-  slowMove(servo.read(), deg, 5);
+/* ======================
+   SERVO ACTION COMMANDS
+   ====================== */
+
+void ServoClaw::open() {
+    targetAngle = SERVO_OPEN_ANGLE;
 }
 
-void ServoClaw::close(float deg) {
-  slowMove(servo.read(), deg, 5);
+void ServoClaw::close() {
+    targetAngle = SERVO_CLOSE_ANGLE;
+}
+
+void ServoClaw::closeStrong() {
+    targetAngle = SERVO_STRONG_CLOSE_ANGLE;
+}
+
+void ServoClaw::setCustomTarget(int angle) {
+    targetAngle = constrain(angle, 0, 180);
 }

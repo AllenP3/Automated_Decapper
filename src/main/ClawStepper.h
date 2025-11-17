@@ -1,26 +1,55 @@
-#pragma once
+#ifndef CLAW_STEPPER_H
+#define CLAW_STEPPER_H
+
 #include <Arduino.h>
+#include "Pins.h"
+#include "Config.h"
 
 class ClawStepper {
 public:
-  void init(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t hallPin);
+    ClawStepper();
 
-  void home();
-  void rotateDegrees(float deg);
-  void moveSteps(long steps);
-  void stop();
+    void begin();
+    void update();
 
-  void setStepDelay(int ms);
+    // Movement
+    void rotateDegrees(float deg);   // rotate relative
+    void rotateToDegrees(float deg); // rotate absolute
+    void rotateSteps(long steps);    // raw steps
+    void moveToSteps(long targetSteps);
+
+    // Homing
+    void home();
+    bool isHomed() const { return homed; }
+
+    // State
+    bool isBusy() const { return currentStep != targetStep; }
 
 private:
-  void writeStep(int a, int b, int c, int d);
+    // hardware stepping
+    void stepOnce(int dir);
 
-  uint8_t IN1, IN2, IN3, IN4, HALL_PIN;
-  int stepDelay = 3;
-  float degreesPerStep = 1.8;   // gear ratio adjusted externally
+    // Internal state
+    long currentStep = 0;
+    long targetStep  = 0;
 
-  int seq[8][4] = {
-    {1,0,0,0},{1,1,0,0},{0,1,0,0},{0,1,1,0},
-    {0,0,1,0},{0,0,1,1},{0,0,0,1},{1,0,0,1}
-  };
+    unsigned long lastStepTime = 0;
+
+    bool homed = false;
+
+    // 28BYJ half-step sequence
+    const uint8_t seq[8][4] = {
+        {1,0,0,0},
+        {1,1,0,0},
+        {0,1,0,0},
+        {0,1,1,0},
+        {0,0,1,0},
+        {0,0,1,1},
+        {0,0,0,1},
+        {1,0,0,1}
+    };
+
+    uint8_t seqIndex = 0;
 };
+
+#endif
