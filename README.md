@@ -1,388 +1,391 @@
+Here is your **new, updated, complete README**, rewritten to match:
+
+✔ your **new joystick-based UI**
+✔ your **OLED menu system**
+✔ the **RoutineManager**
+✔ the **modular actuator classes** (Linear, Rail, Claw, Servo)
+✔ the **clean structured architecture**
+✔ your new **Config.h**, **Safety**, **Indicators**, etc.
+✔ the new **hybrid scheduler**
+✔ the new **folders & file naming**
+
+This README is clean, professional, accurate to your current system, and future-proof.
 
 ---
 
 # 📦 Decapper Control System (Arduino MEGA)
 
-*A modular multi-axis robotic decapper with screw-cap and snaplink capabilities.*
+*A modular multi-axis robotic system for automatic screw-cap and snaplink decapping.*
 
 ---
 
-## 🔧 Features
+# 🧩 Overview
 
-* Linear actuator (TMC2209)
-* Rail stepper (28BYJ-48 + ULN2003)
-* Claw rotation stepper (28BYJ-48 + ULN2003)
-* Servo claw (MG996R)
-* Limit switches + Hall sensor for homing
-* Hardware control panel
-* Mode-based execution system
-* Fully modular class-based C++ design
-* Extendable routines
+This project implements a **full robotic decapper** built on:
 
----
-
-## 📁 Project Structure
-
-> **Important:** Arduino IDE requires *all files in the same folder*.
-
-```
-src/
-├─ main/
-    │  main.ino
-    │
-    ├─ PanelIO.h
-    ├─ PanelIO.cpp
-    │
-    ├─ LinearActuator.h
-    ├─ LinearActuator.cpp
-    │
-    ├─ RailStepper.h
-    ├─ RailStepper.cpp
-    │
-    ├─ ClawStepper.h
-    ├─ ClawStepper.cpp
-    │
-    ├─ ServoClaw.h
-    ├─ ServoClaw.cpp
-    │
-    ├─ Calibration.h
-    ├─ Calibration.cpp
-    │
-    ├─ ScrewRoutine.h
-    ├─ ScrewRoutine.cpp
-    │
-    ├─ SnaplinkRoutine.h
-    └─ SnaplinkRoutine.cpp
-```
+* ✔ Arduino Mega
+* ✔ TMC2209 linear actuator
+* ✔ 2× 28BYJ-48 steppers (rail + claw rotation)
+* ✔ MG996R servo claw
+* ✔ Hall sensor + limit switch homing
+* ✔ OLED graphical UI with joystick navigation
+* ✔ Modular C++ architecture
+* ✔ Safe hybrid motion scheduling
+* ✔ Snaplink & Screw-cap routines
+* ✔ Fully non-blocking, real-time loop (200 Hz)
 
 ---
 
-## 🎮 Control Panel Overview
+# 🎯 High-Level Features
 
-### **3-Way Mode Switch**
+### **🖥 Graphical OLED UI**
 
-| Position | Description           |
-| -------- | --------------------- |
-| OFF      | System disabled       |
-| SNAPLINK | Run snaplink routine  |
-| SCREW    | Run screw-cap routine |
+* 1.3" SH1106 display
+* Mode selection (SNAP, SCREW, HOME, JOG, INFO)
+* Real-time progress bar
+* Jog movement feedback
+* Homing, error, and status display
 
-### **2-Way Function Switch**
+### **🕹 Joystick Input**
 
-| Position  | Description        |
-| --------- | ------------------ |
-| CALIBRATE | Homes all motors   |
-| EXECUTE   | Runs selected mode |
+* Left/right → switch modes
+* Up/down → jog axes
+* Click → servo open/close
+* Start/Stop buttons for actions
 
-### **Buttons**
+### **🦾 Multi-Axis Actuator Control**
 
-| Button | Action                      |
-| ------ | --------------------------- |
-| START  | Begin action / calibration  |
-| STOP   | Immediately halt all motors |
+* **Linear Actuator / TMC2209 / AccelStepper**
+* **Rail Stepper (ULN2003)**
+* **Claw Rotation Stepper (ULN2003 + Hall sensor)**
+* **Servo Claw (MG996R)**
+
+### **🧠 Modular Routines**
+
+* SnapLinkRoutine
+* ScrewRoutine
+* HomeRoutine
+* JogRoutine
+* CalibrationRoutine
+* RoutineManager responsible for orchestrating them
+
+### **⚡ Safety System**
+
+* Hard STOP interrupt
+* Motion lockouts
+* Sensor polarity configuration
+* Load-based actuator scheduling
 
 ---
 
-## 🧠 System Workflow
+# 📁 Project Structure
 
 ```
-[Select Mode]
-      ↓
-[Select Function]
-      ↓
-   Press START
-      ↓
--------------------------
-| CALIBRATE → Home all |
-| EXECUTE   → Run mode |
--------------------------
-      ↓
- Press STOP anytime
+/src
+│
+├── main/
+│     ├── main.ino
+│     ├── RoutineManager.h
+│     ├── RoutineManager.cpp
+│
+│     ├── LinearActuator.h
+│     ├── LinearActuator.cpp
+│     ├── RailStepper.h
+│     ├── RailStepper.cpp
+│     ├── ClawStepper.h
+│     ├── ClawStepper.cpp
+│     ├── ServoClaw.h
+│     └── ServoClaw.cpp
+│
+│     ├── HomeRoutine.h
+│     ├── HomeRoutine.cpp
+│     ├── JogRoutine.h
+│     ├── JogRoutine.cpp
+│     ├── SnapLinkRoutine.h
+│     ├── SnapLinkRoutine.cpp
+│     ├── ScrewRoutine.h
+│     ├── ScrewRoutine.cpp
+│     ├── CalibrationRoutine.h
+│     └── CalibrationRoutine.cpp
+│
+│     ├── UI_OLED.h
+│     └── UI_OLED.cpp
+│
+│     ├── Safety.h
+│     ├── Safety.cpp
+│     ├── Indicators.h
+│     ├── Indicators.cpp
+│     ├── Pins.h
+│     └── Config.h
+│
+└── README.md
 ```
+
+> Arduino IDE requires all files to reside in the same folder,
+> but this virtual structure shows the intended modular layout.
 
 ---
 
 # 🔌 Hardware Components
 
-### Motors
+### **Actuators**
 
-| Component       | Driver  | Notes               |
-| --------------- | ------- | ------------------- |
-| Linear Actuator | TMC2209 | Limit switch homing |
-| Rail Stepper    | ULN2003 | Full-step sequence  |
-| Claw Stepper    | ULN2003 | Hall effect homing  |
-| Servo Claw      | MG996R  | Smooth open/close   |
-
-### Inputs
-
-* Mode switch (3-way)
-* Function switch (2-way)
-* START button
-* STOP button
-* Linear actuator limit switch
-* Rail limit switch
-* Claw hall sensor
+| Component             | Driver                    | Notes               |
+| --------------------- | ------------------------- | ------------------- |
+| Linear Actuator       | TMC2209 (UART + STEP/DIR) | Limit switch homing |
+| Rail Stepper          | ULN2003                   | Full-step sequence  |
+| Claw Rotation Stepper | ULN2003                   | Hall sensor homing  |
+| Servo Claw            | MG996R                    | Smooth easing       |
 
 ---
 
-# 🛠 Code Modules
+# 🧱 Code Architecture
 
-Each component has its own `.h/.cpp` pair for clean modularity.
+### **Documentation for each module**
 
 ---
 
-## **1. PanelIO**
+## 🧩 **1. Config.h**
 
-Handles:
+Central configuration file controlling:
 
-* Reading hardware switches
-* Debouncing
-* Mode/function determination
-* START/STOP logic
+* Sensor polarity
+* Axis speeds
+* Servo limits
+* Motion scheduling rules
+* Routine timing
+* Jog speeds
+* System tick rate
 
-File:
+Change everything here — **no rewrites needed.**
+
+---
+
+## 🧩 **2. Pins.h**
+
+Pin definitions for:
+
+* Linear actuator STEP/DIR/EN
+* Rail & Claw stepper coils
+* Limit & Hall sensors
+* Servo
+* Joystick
+* Buttons
+* Indicators
+
+Clean and consistent.
+
+---
+
+## 🧩 **3. Safety System**
+
+Files:
 
 ```
-PanelIO.h / PanelIO.cpp
+Safety.h
+Safety.cpp
 ```
+
+Provides:
+
+* STOP button override
+* Emergency shutdown
+* Motor disable
+* Safety flags
+* Door switch compatibility
+
+Integrated into main loop at high priority.
 
 ---
 
-## **2. LinearActuator**
+## 🧩 **4. Indicators**
+
+Files:
+
+```
+Indicators.h
+Indicators.cpp
+```
+
+LED animations for:
+
+* IDLE → breathing
+* RUN → blinking
+* ERROR → solid red
+
+Driven at 200 Hz via main loop.
+
+---
+
+## 🧩 **5. UI_OLED**
+
+Files:
+
+```
+UI_OLED.h
+UI_OLED.cpp
+```
 
 Features:
 
-* TMC2209 step/direction control
-* Homing with limit switch
-* Soft limits
-* Absolute & relative movement
-* Configurable speed
-
-File:
-
-```
-LinearActuator.h / LinearActuator.cpp
-```
+* Mode strip with animated highlight
+* Header bar with status indicator (IDLE / RUN / HOME)
+* Progress bar system
+* Jog feedback
+* Info screens
+* Full non-blocking draw cycle
 
 ---
 
-## **3. RailStepper**
+# 🚦 Routines Overview
 
-Features:
+### All routines follow:
 
-* Homing using limit switch
-* Full-step sequence
-* Adjustable movement speed
-
-File:
-
-```
-RailStepper.h / RailStepper.cpp
-```
+* State machine design
+* Non-blocking updates
+* Hybrid power scheduling
+* Safety check every cycle
+* UI updates every frame
 
 ---
 
-## **4. ClawStepper**
-
-Features:
-
-* Hall effect homing
-* Degree-based rotation
-* Smooth step sequencing
-
-File:
-
-```
-ClawStepper.h / ClawStepper.cpp
-```
-
----
-
-## **5. ServoClaw**
-
-Features:
-
-* Smooth open/close
-* Tunable speed
-* Adjustable grip angles
-
-File:
-
-```
-ServoClaw.h / ServoClaw.cpp
-```
-
----
-
-## **6. Calibration Routine**
-
-Homes all axes:
-
-* Linear actuator
-* Rail stepper
-* Claw stepper
-
-File:
-
-```
-Calibration.h / Calibration.cpp
-```
-
----
-
-## **7. ScrewRoutine**
+## 🔧 **HomeRoutine**
 
 Sequence:
 
-1. Open claw
-2. Lower to cap
-3. Grip
-4. Break torque
-5. Rotate while lifting
-6. Final lift
-7. Hold cap securely
-
-File:
-
-```
-ScrewRoutine.h / ScrewRoutine.cpp
-```
+1. Rail → home
+2. Claw → hall sensor
+3. Linear → upper limit
+4. Servo → open
+5. Reset axes & flags
 
 ---
 
-## **8. SnaplinkRoutine**
+## 🔧 **JogRoutine**
 
-Sequence:
+User-controlled:
 
-1. Open claw
-2. Lower
-3. Partial grip
-4. Align with small rotation
-5. Quick upward “snap” motion
-6. Reset
-
-File:
-
-```
-SnaplinkRoutine.h / SnaplinkRoutine.cpp
-```
+* X = claw rotation
+* Y = linear actuator
+* Press = servo open/close
+* Compliant movement based on Config.h jog speeds
 
 ---
 
-# 📌 Tuning Parameters
+## 🔧 **SnapLinkRoutine**
 
-### Linear Actuator
-
-* steps/mm
-* max/min travel
-* speed (microsecond delay)
-
-### Rail Stepper
-
-* stepDelay
-* direction
-* homing logic
-
-### Claw Stepper
-
-* degreesPerStep
-* rotation speed
-
-### Servo
-
-* open angle
-* close angle
-
-### Routines
-
-* movement distances
-* timing
-* grip strengths
-* rotational amounts
+1. Rail moves into position
+2. Linear actuator lowers
+3. Servo closes claw
+4. Linear actuator lifts sharply
+5. Rail returns home
 
 ---
 
-# 🧪 Testing Instructions
+## 🔧 **ScrewRoutine**
 
-### Test Motors Individually
+1. Rail moves into position
+2. Linear actuator lowers
+3. Servo closes strongly
+4. Torque break rotation
+5. Continuous rotation + slow upward lift
+6. Linear full lift
+7. Rail retreats
+
+---
+
+## 🔧 **CalibrationRoutine**
+
+Joystick-assisted positioning for:
+
+* Linear
+* Rail
+* Claw
+* Servo
+
+Stores calibration offsets.
+
+---
+
+# 🧠 RoutineManager
+
+Files:
+
+```
+RoutineManager.h
+RoutineManager.cpp
+```
+
+Coordinates everything:
+
+* Determines which routine to run
+* Owns routine state
+* Triggers run() calls
+* Passes progress to UI
+* Ensures no routine overlaps
+
+Main loop becomes extremely clean:
 
 ```cpp
-lin.moveRelative(5);
-rail.moveSteps(200);
-claw.rotateDegrees(120);
-servo.open(150);
-```
+void loop() {
+    ui.update();
+    safety.update();
+    indicators.update();
 
-### Test Calibration
+    linear.update();
+    rail.update();
+    claw.update();
+    servo.update();
 
-1. Set function → **CALIBRATE**
-2. Press **START**
-
-### Test Action Modes
-
-1. Set mode → SNAPLINK or SCREW
-2. Set function → EXECUTE
-3. Press START
-
-### Emergency Stop
-
-STOP button must interrupt motion at all times.
-
----
-
-# ⚠️ Safety Notes
-
-* Always perform homing before running routines.
-* STOP immediately disables all motors.
-* Use proper current limit on TMC2209.
-* Never operate without end-stops connected.
-* Keep hands away from rotating axes.
-
----
-
-# 🧱 How to Add a New Routine
-
-1. Create two new files:
-
-```
-MyRoutine.h
-MyRoutine.cpp
-```
-
-2. Forward declare dependencies in `.h`:
-
-```cpp
-class LinearActuator;
-class RailStepper;
-class ClawStepper;
-class ServoClaw;
-```
-
-3. Implement logic in `.cpp`.
-
-4. Register in `Decapper.ino`:
-
-```cpp
-if (panel.mode() == PanelIO::MODE_MYMODE) {
-    MyRoutine::run(lin, rail, claw, servo);
+    routineManager.update();
 }
 ```
 
 ---
 
-# 👥 Team Roles (Recommended)
+# 🧪 Testing Instructions
 
-| Person     | Role                            |
-| ---------- | ------------------------------- |
-|  A | Motor tuning & homing           |
-|  B | Screw & Snaplink logic          |
-|  C | PanelIO & main control          |
-|  D | Wiring, connectors, control box |
+### **1. UI & Input Test**
+
+* Move joystick L/R → mode cycles
+* Press START → begins routine
+* Press STOP → forces halt
+
+### **2. Motor Tests (individual)**
+
+```cpp
+linear.moveToMM(40);
+rail.moveSteps(500);
+claw.rotateDegrees(90);
+servo.open();
+```
+
+### **3. Jog Test**
+
+Select JOG → move joystick in 4 directions.
+
+### **4. Homing Test**
+
+Select HOME → START.
+
+### **5. Routine Test**
+
+SNAP or SCREW → EXECUTE → START.
+
+---
+
+# ⚠️ Safety Guidelines
+
+* Never run without endstops connected.
+* Perform HOMING before any routine.
+* STOP button must always be reachable.
+* Keep fingers away from claw and rotation axis.
+* Adjust TMC2209 Vref properly.
 
 ---
 
 # 📜 License
 
-MIT License — free to modify, use, and extend.
+MIT — free for personal or commercial use.
 
 ---
