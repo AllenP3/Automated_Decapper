@@ -3,7 +3,7 @@
 
 static const char* MODE_NAMES[] = {"SNAP", "SCREW", "HOME", "JOG", "INFO"};
 
-PanelIO::PanelIO()
+UI_OLED::UI_OLED()
 : u8g2(U8G2_R0, U8X8_PIN_NONE)
 {
     currentMode = MODE_SNAP;
@@ -16,7 +16,7 @@ PanelIO::PanelIO()
     animBlink = false;
 }
 
-void PanelIO::begin() {
+void UI_OLED::begin() {
     pinMode(JOY_SW_PIN, INPUT_PULLUP);
     pinMode(BTN_START, INPUT_PULLUP);
     pinMode(BTN_STOP, INPUT_PULLUP);
@@ -26,7 +26,7 @@ void PanelIO::begin() {
     delay(800);
 }
 
-void PanelIO::update() {
+void UI_OLED::update() {
     unsigned long now = millis();
 
     // animation tick
@@ -44,26 +44,26 @@ void PanelIO::update() {
 // ------------------------------------------------------------
 // ACCESSORS
 // ------------------------------------------------------------
-Mode PanelIO::getMode() const {
+Mode UI_OLED::getMode() const {
     return currentMode;
 }
 
-bool PanelIO::startRequested() {
+bool UI_OLED::startRequested() {
     return buttonPressed(BTN_START);
 }
 
-bool PanelIO::stopRequested() {
+bool UI_OLED::stopRequested() {
     return (digitalRead(BTN_STOP) == LOW);
 }
 
-bool PanelIO::homingNeeded() const {
+bool UI_OLED::homingNeeded() const {
     return needsHoming;
 }
 
 // ------------------------------------------------------------
 // BUTTON + JOYSTICK UTILITIES
 // ------------------------------------------------------------
-bool PanelIO::buttonPressed(int pin) {
+bool UI_OLED::buttonPressed(int pin) {
     if (digitalRead(pin) == LOW) {
         unsigned long now = millis();
         if (now - lastButtonTime > debounceMs) {
@@ -74,7 +74,7 @@ bool PanelIO::buttonPressed(int pin) {
     return false;
 }
 
-int PanelIO::smoothRead(int pin) {
+int UI_OLED::smoothRead(int pin) {
     long sum = 0;
     for (int i = 0; i < 8; i++) {
         sum += analogRead(pin);
@@ -86,7 +86,7 @@ int PanelIO::smoothRead(int pin) {
 // ------------------------------------------------------------
 // MODE SWITCHING VIA JOYSTICK
 // ------------------------------------------------------------
-void PanelIO::handleJoystickModeSwitch() {
+void UI_OLED::handleJoystickModeSwitch() {
     int xVal = smoothRead(JOY_X_PIN);
     static unsigned long lastMove = 0;
 
@@ -107,7 +107,7 @@ void PanelIO::handleJoystickModeSwitch() {
 // ------------------------------------------------------------
 // DRAWING HELPERS
 // ------------------------------------------------------------
-void PanelIO::drawHeaderBar() {
+void UI_OLED::drawHeaderBar() {
     u8g2.setFont(u8g2_font_t0_11b_tf);
 
     u8g2.drawStr(2, 10, "DECAP CTRL");
@@ -125,7 +125,7 @@ void PanelIO::drawHeaderBar() {
     u8g2.drawStr(x + (w - sw) / 2, y + 8, status);
 }
 
-void PanelIO::drawModeStrip() {
+void UI_OLED::drawModeStrip() {
     u8g2.setFont(u8g2_font_5x8_tr);
     int y = 62;
     int x = 0;
@@ -153,13 +153,13 @@ void PanelIO::drawModeStrip() {
     }
 }
 
-void PanelIO::drawCentered(const char* text, int y, const uint8_t* font) {
+void UI_OLED::drawCentered(const char* text, int y, const uint8_t* font) {
     u8g2.setFont(font);
     int w = u8g2.getStrWidth(text);
     u8g2.drawStr((128 - w) / 2, y, text);
 }
 
-void PanelIO::drawIdleScreen() {
+void UI_OLED::drawIdleScreen() {
     u8g2.clearBuffer();
     drawHeaderBar();
 
@@ -188,7 +188,7 @@ void PanelIO::drawIdleScreen() {
     u8g2.sendBuffer();
 }
 
-void PanelIO::drawProgressScreen(const char* title,
+void UI_OLED::drawProgressScreen(const char* title,
                                  const char* phase,
                                  float p)
 {
@@ -215,7 +215,7 @@ void PanelIO::drawProgressScreen(const char* title,
 // ------------------------------------------------------------
 // MESSAGES FOR ROUTINES
 // ------------------------------------------------------------
-void PanelIO::showScreen(const char* title, const char* subtitle) {
+void UI_OLED::showScreen(const char* title, const char* subtitle) {
     u8g2.clearBuffer();
     drawHeaderBar();
     drawCentered(title, 32, u8g2_font_ncenB08_tr);
@@ -223,7 +223,7 @@ void PanelIO::showScreen(const char* title, const char* subtitle) {
     u8g2.sendBuffer();
 }
 
-void PanelIO::showMessage(const char* t, const char* s, int d) {
+void UI_OLED::showMessage(const char* t, const char* s, int d) {
     showScreen(t, s);
     delay(d);
 }
@@ -231,7 +231,7 @@ void PanelIO::showMessage(const char* t, const char* s, int d) {
 // ------------------------------------------------------------
 // PROGRESS PHASE (USED BY SNAP, SCREW, HOME...)
 // ------------------------------------------------------------
-bool PanelIO::runPhase(const char* title,
+bool UI_OLED::runPhase(const char* title,
                        const char* sub,
                        unsigned long duration)
 {

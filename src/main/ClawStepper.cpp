@@ -1,78 +1,39 @@
-#include "ClawStepper.h"
+#include "CalibrationRoutine.h"
 
-ClawStepper::ClawStepper() {}
+void CalibrationRoutine::run(
+    UI_OLED &ui,
+    LinearActuator &lin,
+    RailStepper &rail,
+    ClawStepper &claw,
+    ServoClaw &servo
+) {
+    ui.showMessage("CALIBRATION", "Use joystick");
+    delay(800);
 
-void ClawStepper::begin() {
-    pinMode(PIN_CLAW_IN1, OUTPUT);
-    pinMode(PIN_CLAW_IN2, OUTPUT);
-    pinMode(PIN_CLAW_IN3, OUTPUT);
-    pinMode(PIN_CLAW_IN4, OUTPUT);
-
-    pinMode(PIN_CLAW_HALL, INPUT_PULLUP);
-
-    homed = false;
-}
-
-void ClawStepper::update() {
-    if (!isBusy()) return;
-
-    if (millis() - lastStepTime < CLAW_STEP_DELAY_US) return;
-    lastStepTime = millis();
-
-    int dir = (targetStep > currentStep) ? +1 : -1;
-    currentStep += dir;
-
-    stepOnce(dir);
-}
-
-void ClawStepper::stepOnce(int dir) {
-    seqIndex = (seqIndex + dir) & 7;
-
-    digitalWrite(PIN_CLAW_IN1, seq[seqIndex][0]);
-    digitalWrite(PIN_CLAW_IN2, seq[seqIndex][1]);
-    digitalWrite(PIN_CLAW_IN3, seq[seqIndex][2]);
-    digitalWrite(PIN_CLAW_IN4, seq[seqIndex][3]);
-}
-
-void ClawStepper::rotateSteps(long steps) {
-    targetStep = currentStep + steps;
-}
-
-void ClawStepper::moveToSteps(long tgt) {
-    targetStep = tgt;
-}
-
-void ClawStepper::rotateDegrees(float deg) {
-    long steps = deg * CLAW_STEPS_PER_DEG;  
-    rotateSteps(steps);
-}
-
-void ClawStepper::rotateToDegrees(float deg) {
-    long tgt = deg * CLAW_STEPS_PER_DEG;
-    moveToSteps(tgt);
-}
-
-void ClawStepper::home() {
-    // Move slowly clockwise until hall sensor triggers
     while (true) {
-        bool hallTriggered = CLAW_HALL_ACTIVE_LOW
-                             ? (digitalRead(PIN_CLAW_HALL) == LOW)
-                             : (digitalRead(PIN_CLAW_HALL) == HIGH);
 
-        if (hallTriggered) break;
+        if (ui.stopRequested()) {
+            ui.showMessage("Cancelled", "No changes saved");
+            delay(800);
+            return;
+        }
 
-        stepOnce(+1);
-        delayMicroseconds(CLAW_HOMING_STEP_DELAY_US);
+        if (ui.startRequested()) {
+            ui.showMessage("Saved", "Calibration done");
+            delay(800);
+            return;
+        }
+
+        int x = analogRead(PIN_JOY_X);
+        int y = analogRead(PIN_JOY_Y);
+
+        if (x < 400) claw.rotateSteps(-JOG_CLAW_SPEED_STEPS);
+        else if (x > 600) claw.rotateSteps(JOG_CLAW_SPEED_STEPS);
+
+        if (y < 400) lin.moveSteps(JOG_LINEAR_SPEED_STEPS);
+        else if (y > 600) lin.moveSteps(-JOG_LINEAR_SPEED_STEPS);
+
+        if (digitalRead(PIN_JOY_SW) == LOW) servo.close();
+        else servo.open();
     }
-
-    // Small retreat for clean-zero
-    for (int i = 0; i < 30; i++) {
-        stepOnce(-1);
-        delayMicroseconds(CLAW_HOMING_STEP_DELAY_US);
-    }
-
-    currentStep = 0;
-    targetStep  = 0;
-
-    homed = true;
 }

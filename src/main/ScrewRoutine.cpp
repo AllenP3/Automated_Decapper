@@ -1,50 +1,79 @@
 #include "ScrewRoutine.h"
-#include "LinearActuator.h"
-#include "RailStepper.h"
-#include "ClawStepper.h"
-#include "ServoClaw.h"
 
-void ScrewRoutine::run(LinearActuator& lin, RailStepper& rail, ClawStepper& claw, ServoClaw& servo) {
-  Serial.println("=== SCREW ROUTINE START ===");
+ScrewRoutine::ScrewRoutine()
+: state(IDLE), active(false) {}
 
-  // OPEN CLAW fully
-  Serial.println("Opening claw...");
-  servo.open(140);     // tune angle
+void ScrewRoutine::begin() {
+    active = false;
+    state = IDLE;
+}
 
-  // LOWER to cap position
-  Serial.println("Lowering to cap...");
-  lin.moveTo(20);      // mm from top (tune)
+void ScrewRoutine::start() {
+    active = true;
+    state = MOVE_RAIL_FORWARD;
+    phaseStart = millis();
+}
 
-  // CLOSE claw to grip cap
-  Serial.println("Gripping cap...");
-  servo.close(60);     // tune grip angle
-  delay(300);
+void ScrewRoutine::update() {
+    if (!active) return;
 
-  // BREAK INITIAL TORQUE
-  Serial.println("Breaking torque...");
-  claw.rotateDegrees(30);   // small wiggle
-  claw.rotateDegrees(-30);  // backwards
-  delay(100);
+    switch (state) {
 
-  // BEGIN UNSCREWING WHILE LIFTING
-  Serial.println("Unscrewing while lifting...");
+    case MOVE_RAIL_FORWARD:
+        rail->moveTo(RAIL_MAX_TRAVEL_STEPS);
+        state = MOVE_LINEAR_DOWN;
+        break;
 
-  float liftDistance = -12;    // mm upward while unscrewing
-  float perTurnLift  = -1.5;   // mm to lift per 90° turn
-  int turns = 8;               // 8 × 90° = 720°, usually enough
+    case MOVE_LINEAR_DOWN:
+        if (!rail->isBusy()) {
+            lin->moveToMM(50);
+            state = CLOSE_CLAW;
+        }
+        break;
 
-  for (int i = 0; i < turns; i++) {
-    claw.rotateDegrees(90);             // rotate 90°
-    lin.moveRelative(perTurnLift);      // lift up simultaneously
-    delay(10);
-  }
+    case CLOSE_CLAW:
+        if (!lin->isBusy()) {
+            servo->closeStrong();
+            state = BREAK_TORQUE;
+            phaseStart = millis();
+        }
+        break;
 
-  // FINAL LIFT TO CLEAR THREADS
-  Serial.println("Final lift...");
-  lin.moveRelative(-8);
+    case BREAK_TORQUE:
+        if (!servo->isBusy()) {
+            claw->rotateDegrees(CLAW_TWIST_BREAK_DEGREES);
+            state = UNSCREW_ROTATE;
+        }
+        break;
 
-  // KEEP CLAW CLOSED (cap held)
-  Serial.println("Cap removed. Holding cap safely.");
+    case UNSCREW_ROTATE:
+        if (!claw->isBusy()) {
+            // Begin continuous CCW rotation
+            claw->rotateSteps(99999);
 
-  Serial.println("=== SCREW ROUTINE COMPLETE ===");
+            // Linear actuator rises slowly while claw rotates
+            long upSteps = (LIN_UNSCREW_UP_MMPS / LIN_MM_PER_STEP) * 2; // small chunk
+            lin->moveSteps(-upSteps);
+
+            state = LIFT_UP;
+        }
+        break;
+
+    case LIFT_UP:
+        claw->update();
+        lin->update();
+
+        if (!claw->isBusy() && !lin->isBusy()) {
+            state = MOVE_RAIL_BACK;
+            rail->moveTo(0);
+        }
+        break;
+
+    case MOVE_RAIL_BACK:
+        if (!rail->isBusy()) {
+            active = false;
+            state = IDLE;
+        }
+        break;
+    }
 }

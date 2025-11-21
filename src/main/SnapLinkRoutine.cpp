@@ -1,45 +1,62 @@
-#include "SnaplinkRoutine.h"
-#include "LinearActuator.h"
-#include "RailStepper.h"
-#include "ClawStepper.h"
-#include "ServoClaw.h"
+#include "SnapLinkRoutine.h"
 
-void SnaplinkRoutine::run(LinearActuator& lin, RailStepper& rail, ClawStepper& claw, ServoClaw& servo) {
-  Serial.println("=== SNAPLINK ROUTINE START ===");
+SnapLinkRoutine::SnapLinkRoutine()
+: state(IDLE), active(false) {}
 
-  // OPEN CLAW wide
-  Serial.println("Opening claw...");
-  servo.open(135);   // adjust to your linkage width
+void SnapLinkRoutine::begin() {
+    state = IDLE;
+    active = false;
+}
 
-  // MOVE DOWN to snaplink height
-  Serial.println("Lowering into position...");
-  lin.moveTo(14);    // tune exact height
+void SnapLinkRoutine::start() {
+    active = true;
+    state = MOVE_RAIL_FORWARD;
+    phaseStart = millis();
+}
 
-  // CLOSE CLAW PARTIALLY — not too tight
-  Serial.println("Gripping snaplink lightly...");
-  servo.close(80);   // partial grip, tune as needed
-  delay(300);
+void SnapLinkRoutine::update() {
+    if (!active) return;
 
-  // ROTATE to engage snaplink
-  Serial.println("Rotating to engage snaplink...");
-  claw.rotateDegrees(45);   // gentle rotation
-  delay(50);
+    switch (state) {
 
-  // PULL UP sharply to release snaplink
-  Serial.println("Pulling to release...");
-  lin.moveRelative(-5);     // upward snap
-  delay(100);
+    case MOVE_RAIL_FORWARD:
+        rail->moveTo(RAIL_MAX_TRAVEL_STEPS);
+        state = MOVE_LINEAR_DOWN;
+        break;
 
-  // SMALL ROTATION BACK to neutral
-  claw.rotateDegrees(-45);
+    case MOVE_LINEAR_DOWN:
+        if (!rail->isBusy()) {
+            lin->moveToMM(50);
+            state = CLOSE_CLAW;
+        }
+        break;
 
-  // MOVE UP to safe height
-  Serial.println("Returning to safe height...");
-  lin.moveTo(0);
+    case CLOSE_CLAW:
+        if (!lin->isBusy()) {
+            servo->close();
+            state = PULL_UP;
+        }
+        break;
 
-  // OPEN CLAW to release link
-  Serial.println("Releasing snaplink...");
-  servo.open(140);
+    case PULL_UP:
+        if (!servo->isBusy()) {
+            lin->moveToMM(0);
+            state = MOVE_RAIL_BACK;
+        }
+        break;
 
-  Serial.println("=== SNAPLINK ROUTINE COMPLETE ===");
+    case MOVE_RAIL_BACK:
+        if (!lin->isBusy()) {
+            rail->moveTo(0);
+            state = DONE;
+        }
+        break;
+
+    case DONE:
+        if (!rail->isBusy()) {
+            active = false;
+            state = IDLE;
+        }
+        break;
+    }
 }

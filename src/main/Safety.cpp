@@ -38,7 +38,7 @@ void Safety::emergencyStop() {
     locked   = true;
 
     if (linAct)  linAct->stop();
-    if (railAct) railAct->moveTo(railAct->homed ? 0 : 0); // freeze
+    if (railAct) railAct->moveTo(0); // freeze
     if (clawAct) clawAct->rotateSteps(0);
     if (servoAct) servoAct->open();
 }

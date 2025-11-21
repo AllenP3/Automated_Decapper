@@ -1,62 +1,46 @@
-#include "PanelIO.h"
+#include "Pins.h"
+#include "Config.h"
+
+#include "UI_OLED.h"
+#include "Safety.h"
+#include "RoutineManager.h"
+
 #include "LinearActuator.h"
 #include "RailStepper.h"
 #include "ClawStepper.h"
 #include "ServoClaw.h"
-#include "Calibration.h"
-#include "ScrewRoutine.h"
-#include "SnaplinkRoutine.h"
 
+// ----------------- GLOBAL OBJECTS -----------------
 
-// Global objects
-PanelIO panel;
+UI_OLED ui;
+Safety safety;
+
 LinearActuator lin;
 RailStepper rail;
 ClawStepper claw;
 ServoClaw servo;
 
-bool running = false;
+RoutineManager routines(ui, safety, lin, rail, claw, servo);
 
 void setup() {
-  Serial.begin(115200);
+    ui.begin();
+    safety.begin();
+    lin.begin();
+    rail.begin();
+    claw.begin();
+    servo.begin();
 
-  // UI panel
-  panel.init(24, 25, 26, 27, 28);  // modeA, modeB, func, start, stop
-
-  // Motor initialisation
-  lin.init(11, 12, 10);            // step, dir, en
-  rail.init(2, 3, 4, 5, 22);       // in1–4, limit switch
-  claw.init(6, 7, 8, 9, 23);       // in1–4, hall sensor
-  servo.init(13);                  // servo pin
+    routines.begin();
 }
 
 void loop() {
-  panel.update();
+    ui.update();
+    safety.update();
 
-  if (panel.stopPressed()) {
-    lin.stop();
-    rail.stop();
-    claw.stop();
-    running = false;
-  }
+    lin.update();
+    rail.update();
+    claw.update();
+    servo.update();
 
-  if (panel.startPressed() && !running) {
-    running = true;
-
-    if (panel.mode() == PanelIO::MODE_OFF) {
-      Serial.println("System is OFF. Ignoring START.");
-      running = false;
-    }
-    else if (panel.function() == PanelIO::FUNC_CALIBRATE) {
-      Calibration::runAll(lin, rail, claw);
-    }
-    else if (panel.function() == PanelIO::FUNC_EXECUTE) {
-      if (panel.mode() == PanelIO::MODE_SCREW)
-        ScrewRoutine::run(lin, rail, claw, servo);
-      else if (panel.mode() == PanelIO::MODE_SNAP)
-        SnaplinkRoutine::run(lin, rail, claw, servo);
-    }
-
-    running = false;
-  }
+    routines.update();
 }

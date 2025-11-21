@@ -17,9 +17,9 @@ enum Mode {
 // -----------------------------
 // Main UI Class
 // -----------------------------
-class PanelIO {
+class UI_OLED {
 public:
-    PanelIO();
+    UI_OLED();
 
     // setup & loop
     void begin();
