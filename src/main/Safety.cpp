@@ -3,6 +3,7 @@
 #include "RailStepper.h"
 #include "ClawStepper.h"
 #include "ServoClaw.h"
+#include "Pins.h"
 
 Safety::Safety() {}
 

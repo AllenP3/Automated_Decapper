@@ -22,7 +22,7 @@
 #define PIN_RAIL_IN3    27
 #define PIN_RAIL_IN4    29
 
-#define PIN_RAIL_LIMIT  41   // Same limit switch
+#define PIN_RAIL_LIMIT  41   // Same limit switch (rear)
 
 
 /* =========================================
@@ -41,5 +41,31 @@
 
 #define PIN_SERVO_CLAW  39
 
+
+/* =========================================
+   UI / BUTTONS / JOYSTICK
+   ========================================= */
+
+#define PIN_JOY_X        A0
+#define PIN_JOY_Y        A1
+#define PIN_JOY_SW       22   // joystick switch
+
+// #define PIN_BTN_START     2   // start button
+#define PIN_BTN_STOP      3   // stop button
+
+
+/* =========================================
+   SAFETY INPUTS
+   ========================================= */
+
+#define PIN_ESTOP        52    // emergency stop button (active LOW)
+#define PIN_DOOR_SWITCH  5    // door/cover switch (active LOW)
+
+
+/* =========================================
+   OLED (I2C)
+   ========================================= */
+#define SCL = 21
+#define SDA = 20
 
 #endif

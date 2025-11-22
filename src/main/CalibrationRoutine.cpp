@@ -48,7 +48,7 @@ void CalibrationRoutine::run(
         if (y < 400) lin.moveSteps(JOG_LINEAR_SPEED_STEPS);
         else if (y > 600) lin.moveSteps(-JOG_LINEAR_SPEED_STEPS);
 
-        if (digitalRead(PIN_JOY_SW) == LOW) servo.close();
+        if (digitalRead(PIN_JOY_SW) == HIGH) servo.close();
         else servo.open();
     }
 }

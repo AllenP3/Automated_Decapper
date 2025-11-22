@@ -4,35 +4,42 @@
 static const char* MODE_NAMES[] = {"SNAP", "SCREW", "HOME", "JOG", "INFO"};
 
 UI_OLED::UI_OLED()
-: u8g2(U8G2_R0, U8X8_PIN_NONE)
+: u8g2(U8G2_R0)
 {
     currentMode = MODE_SNAP;
     isRunning = false;
     needsHoming = false;
+
     snapCount = 0;
     screwCount = 0;
+
     lastButtonTime = 0;
+    lastMoveTime = 0;
     lastAnimTick = 0;
     animBlink = false;
 }
 
+// =========================================================
+// INIT
+// =========================================================
 void UI_OLED::begin() {
-    pinMode(JOY_SW_PIN, INPUT_PULLUP);
-    pinMode(BTN_START, INPUT_PULLUP);
-    pinMode(BTN_STOP, INPUT_PULLUP);
+    pinMode(JOY_SW_PIN, INPUT_PULLUP);   // joystick button (active low)
+    pinMode(BTN_STOP,   INPUT_PULLUP);   // stop button
 
     u8g2.begin();
-    showScreen("Decapper UI", "Initializing...");
-    delay(800);
+    showScreen("DECAP UI", "Starting...");
+    delay(600);
 }
 
+// =========================================================
+// UPDATE LOOP
+// =========================================================
 void UI_OLED::update() {
     unsigned long now = millis();
 
-    // animation tick
     if (now - lastAnimTick > 400) {
-        lastAnimTick = now;
         animBlink = !animBlink;
+        lastAnimTick = now;
     }
 
     if (!isRunning) {
@@ -41,88 +48,99 @@ void UI_OLED::update() {
     }
 }
 
-// ------------------------------------------------------------
+// =========================================================
 // ACCESSORS
-// ------------------------------------------------------------
-Mode UI_OLED::getMode() const {
-    return currentMode;
-}
+// =========================================================
+Mode UI_OLED::getMode() const { return currentMode; }
 
 bool UI_OLED::startRequested() {
-    return buttonPressed(BTN_START);
+    return buttonPressed(JOY_SW_PIN); // joystick button is start
 }
 
 bool UI_OLED::stopRequested() {
-    return (digitalRead(BTN_STOP) == LOW);
+    return digitalRead(BTN_STOP) == LOW;
 }
 
-bool UI_OLED::homingNeeded() const {
-    return needsHoming;
-}
+bool UI_OLED::homingNeeded() const { return needsHoming; }
 
-// ------------------------------------------------------------
-// BUTTON + JOYSTICK UTILITIES
-// ------------------------------------------------------------
+// =========================================================
+// BUTTON HANDLING W/ DEBOUNCE
+// =========================================================
 bool UI_OLED::buttonPressed(int pin) {
-    if (digitalRead(pin) == LOW) {
-        unsigned long now = millis();
-        if (now - lastButtonTime > debounceMs) {
-            lastButtonTime = now;
-            return true;
+    static unsigned long lastPressStart = 0;
+    static unsigned long lastPressStop  = 0;
+
+    unsigned long now = millis();
+
+    if (pin == PIN_BTN_START) {
+        if (digitalRead(PIN_BTN_START) == LOW) {
+            if (now - lastPressStart > debounceMs) {
+                lastPressStart = now;
+                return true;
+            }
         }
     }
+
+    if (pin == PIN_BTN_STOP) {
+        if (digitalRead(PIN_BTN_STOP) == LOW) {
+            if (now - lastPressStop > debounceMs) {
+                lastPressStop = now;
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
+
+// =========================================================
+// ANALOG FILTER
+// =========================================================
 int UI_OLED::smoothRead(int pin) {
     long sum = 0;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         sum += analogRead(pin);
-        delayMicroseconds(150);
+        delayMicroseconds(200);
     }
-    return sum / 8;
+    return sum / 6;
 }
 
-// ------------------------------------------------------------
-// MODE SWITCHING VIA JOYSTICK
-// ------------------------------------------------------------
+// =========================================================
+// MODE SWITCHING (WITH DEADZONE)
+// =========================================================
 void UI_OLED::handleJoystickModeSwitch() {
-    int xVal = smoothRead(JOY_X_PIN);
-    static unsigned long lastMove = 0;
+    int x = smoothRead(JOY_X_PIN);
+    unsigned long now = millis();
 
-    if (millis() - lastMove < 220) return;
+    if (now - lastMoveTime < 260) return;
 
-    if (xVal < 350) {
-        if (currentMode == MODE_SNAP) currentMode = MODE_INFO;
-        else currentMode = (Mode)((int)currentMode - 1);
-        lastMove = millis();
+    // DEAD ZONE
+    if (x > 430 && x < 600) return;
+
+    if (x < 430) {
+        currentMode = (currentMode == MODE_SNAP) ? MODE_INFO : (Mode)(currentMode - 1);
+        lastMoveTime = now;
     }
-    else if (xVal > 700) {
-        if (currentMode == MODE_INFO) currentMode = MODE_SNAP;
-        else currentMode = (Mode)((int)currentMode + 1);
-        lastMove = millis();
+    else if (x > 600) {
+        currentMode = (currentMode == MODE_INFO) ? MODE_SNAP : (Mode)(currentMode + 1);
+        lastMoveTime = now;
     }
 }
 
-// ------------------------------------------------------------
-// DRAWING HELPERS
-// ------------------------------------------------------------
+// =========================================================
+// DRAWING
+// =========================================================
 void UI_OLED::drawHeaderBar() {
     u8g2.setFont(u8g2_font_t0_11b_tf);
+    u8g2.drawStr(2, 10, "DECAP");
 
-    u8g2.drawStr(2, 10, "DECAP CTRL");
-
-    int x = 96, y = 2, w = 30, h = 10;
-    u8g2.drawFrame(x, y, w, h);
-    u8g2.drawBox(x + w, y + 3, 3, 4);
-
-    const char* status =
+    const char* st =
         isRunning ? "RUN" :
         needsHoming ? "HOME" : "IDLE";
 
     u8g2.setFont(u8g2_font_5x8_tr);
-    int sw = u8g2.getStrWidth(status);
-    u8g2.drawStr(x + (w - sw) / 2, y + 8, status);
+    u8g2.drawStr(90, 10, st);
 }
 
 void UI_OLED::drawModeStrip() {
@@ -144,8 +162,7 @@ void UI_OLED::drawModeStrip() {
                 int tx = x + w / 2;
                 u8g2.drawTriangle(tx - 3, y - 11, tx + 3, y - 11, tx, y - 7);
             }
-        }
-        else {
+        } else {
             u8g2.drawStr(x + 3, y - 1, name);
         }
 
@@ -153,68 +170,87 @@ void UI_OLED::drawModeStrip() {
     }
 }
 
-void UI_OLED::drawCentered(const char* text, int y, const uint8_t* font) {
+void UI_OLED::drawCentered(const char* t, int y, const uint8_t* font) {
     u8g2.setFont(font);
-    int w = u8g2.getStrWidth(text);
-    u8g2.drawStr((128 - w) / 2, y, text);
+    int w = u8g2.getStrWidth(t);
+    u8g2.drawStr((128 - w) / 2, y, t);
 }
 
 void UI_OLED::drawIdleScreen() {
     u8g2.clearBuffer();
     drawHeaderBar();
 
-    char line1[24];
-    char line2[24];
+    char l1[24], l2[24];
 
     if (currentMode == MODE_SNAP)
-        snprintf(line1, 24, "SNAP C:%ld", snapCount);
+        snprintf(l1, 24, "SNAP C:%ld", snapCount);
     else if (currentMode == MODE_SCREW)
-        snprintf(line1, 24, "SCREW C:%ld", screwCount);
+        snprintf(l1, 24, "SCREW C:%ld", screwCount);
     else if (currentMode == MODE_INFO) {
-        long total = snapCount + screwCount;
-        snprintf(line1, 24, "TOTAL:%ld", total);
+        long t = snapCount + screwCount;
+        snprintf(l1, 24, "TOTAL:%ld", t);
     }
-    else snprintf(line1, 24, "%s MODE", MODE_NAMES[currentMode]);
+    else snprintf(l1, 24, "%s", MODE_NAMES[currentMode]);
 
-    if (needsHoming)
-        snprintf(line2, 24, "Homing required");
-    else
-        snprintf(line2, 24, "START=D2 STOP=D3");
+    snprintf(l2, 24, "START=JOY  STOP=D3");
 
-    drawCentered(line1, 32, u8g2_font_ncenB08_tr);
-    drawCentered(line2, 46, u8g2_font_6x10_tf);
+    drawCentered(l1, 32, u8g2_font_ncenB08_tr);
+    drawCentered(l2, 48, u8g2_font_6x10_tf);
 
     drawModeStrip();
     u8g2.sendBuffer();
 }
 
-void UI_OLED::drawProgressScreen(const char* title,
-                                 const char* phase,
-                                 float p)
-{
-    if (p < 0) p = 0;
-    if (p > 1) p = 1;
-
+void UI_OLED::drawProgressScreen(const char* t, const char* ptxt, float p) {
     u8g2.clearBuffer();
     drawHeaderBar();
-    drawCentered(title, 28, u8g2_font_ncenB08_tr);
+    drawCentered(t, 26, u8g2_font_ncenB08_tr);
 
-    int bx = 16, by = 38, bw = 96, bh = 10;
+    int bw = 100, bh = 10;
+    int bx = 14, by = 40;
+
     u8g2.drawFrame(bx, by, bw, bh);
-
     int fill = p * bw;
+    if (fill < 0) fill = 0;
+    if (fill > bw) fill = bw;
+
     u8g2.drawBox(bx + 1, by + 1, fill - 2, bh - 2);
 
     char buf[24];
-    snprintf(buf, 24, "%s %d%%", phase, (int)(p * 100));
-    drawCentered(buf, 56, u8g2_font_6x10_tf);
+    snprintf(buf, 24, "%s %d%%", ptxt, (int)(p * 100));
+    drawCentered(buf, 60, u8g2_font_6x10_tf);
 
     u8g2.sendBuffer();
 }
 
-// ------------------------------------------------------------
-// MESSAGES FOR ROUTINES
-// ------------------------------------------------------------
+// =========================================================
+// PHASE (USED BY ROUTINES)
+// =========================================================
+bool UI_OLED::runPhase(const char* t, const char* s, unsigned long dur) {
+    isRunning = true;
+    unsigned long start = millis();
+
+    while (millis() - start < dur) {
+        if (stopRequested()) {
+            needsHoming = true;
+            isRunning = false;
+            showScreen("STOPPED", "Interrupted");
+            delay(600);
+            return false;
+        }
+
+        float p = float(millis() - start) / dur;
+        drawProgressScreen(t, s, p);
+        delay(50);
+    }
+
+    drawProgressScreen(t, s, 1.0f);
+    delay(200);
+
+    isRunning = false;
+    return true;
+}
+
 void UI_OLED::showScreen(const char* title, const char* subtitle) {
     u8g2.clearBuffer();
     drawHeaderBar();
@@ -223,37 +259,7 @@ void UI_OLED::showScreen(const char* title, const char* subtitle) {
     u8g2.sendBuffer();
 }
 
-void UI_OLED::showMessage(const char* t, const char* s, int d) {
-    showScreen(t, s);
-    delay(d);
-}
-
-// ------------------------------------------------------------
-// PROGRESS PHASE (USED BY SNAP, SCREW, HOME...)
-// ------------------------------------------------------------
-bool UI_OLED::runPhase(const char* title,
-                       const char* sub,
-                       unsigned long duration)
-{
-    isRunning = true;
-    unsigned long start = millis();
-
-    while (millis() - start < duration) {
-        if (stopRequested()) {
-            needsHoming = true;
-            isRunning = false;
-            showScreen("STOPPED", "Cycle interrupted");
-            delay(600);
-            return false;
-        }
-        float p = float(millis() - start) / duration;
-        drawProgressScreen(title, sub, p);
-        delay(60);
-    }
-
-    drawProgressScreen(title, sub, 1.0f);
-    delay(200);
-
-    isRunning = false;
-    return true;
+void UI_OLED::showMessage(const char* title, const char* subtitle, int delayMs) {
+    showScreen(title, subtitle);
+    delay(delayMs);
 }

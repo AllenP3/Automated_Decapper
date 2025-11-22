@@ -23,17 +23,26 @@ ServoClaw servo;
 RoutineManager routines(ui, safety, lin, rail, claw, servo);
 
 void setup() {
+    Serial.begin(9600);
     ui.begin();
+    // Serial.println("finished ui");
     safety.begin();
+    // Serial.println("finished safety");
     lin.begin();
+    // Serial.println("finished linear");
     rail.begin();
+    // Serial.println("finished rail");
     claw.begin();
+    // Serial.println("finished claw");
     servo.begin();
+    // Serial.println("finished servo");
 
     routines.begin();
+
 }
 
 void loop() {
+    // Serial.print("reached loop");
     ui.update();
     safety.update();
 
