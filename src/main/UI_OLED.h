@@ -53,7 +53,7 @@ private:
     long snapCount;
     long screwCount;
 
-    unsigned long lastButtonTime;
+    unsigned long lastPressTime;
     unsigned long lastMoveTime;
     unsigned long lastAnimTick;
     bool animBlink;
@@ -70,5 +70,7 @@ private:
 
 // ======================= BUTTONS =======================
 #define BTN_STOP 3
+#define PIN_BTN_STOP     3
+#define PIN_BTN_START JOY_SW_PIN
 
 #endif

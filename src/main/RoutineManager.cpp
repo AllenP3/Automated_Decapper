@@ -47,7 +47,7 @@ void RoutineManager::update() {
 
     // IDLE: check start
     if (ui.startRequested()) {
-
+        
         if (ui.homingRequired() &&
             ui.getMode() != MODE_HOME &&
             ui.getMode() != MODE_JOG &&
@@ -55,9 +55,11 @@ void RoutineManager::update() {
         {
             ui.showMessage("HOMING REQUIRED", "Select HOME/JOG");
             return;
+            Serial.println("Stuck in homing");
         }
 
         startRoutine(ui.getMode());
+        Serial.println("Starting routine");
     }
 }
 
@@ -76,27 +78,25 @@ void RoutineManager::startRoutine(Mode mode) {
             break;
 
         case MODE_HOME:
-            activeRoutine = new HomeRoutine(lin, rail, claw);
-            break;
+    activeRoutine = new HomeRoutine(ui, lin, rail, claw);
+    break;
 
-        case MODE_JOG:
-            activeRoutine = new JogRoutine(lin, rail, claw, servo);
-            break;
+case MODE_JOG:
+    activeRoutine = new JogRoutine(ui, lin, rail, claw, servo);
+    break;
 
-        case MODE_INFO:
-            ui.showMessage("INFO", "No routine");
-            return;
+case MODE_CALIBRATE:
+    activeRoutine = new CalibrationRoutine(ui, lin, rail, claw, servo);
+    break;
 
-        case MODE_CALIBRATE:
-            activeRoutine = new CalibrationRoutine(lin, rail, claw, servo);
-            break;
 
         default:
             ui.showMessage("INVALID MODE", "");
             return;
     }
 
-    activeRoutine->begin();
+    activeRoutine->update();
+    Serial.println("Started begin");
 }
 
 void RoutineManager::stopRoutine() {

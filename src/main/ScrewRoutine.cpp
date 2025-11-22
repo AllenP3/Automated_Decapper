@@ -23,6 +23,7 @@ ScrewRoutine::ScrewRoutine(LinearActuator &linRef,
 void ScrewRoutine::begin() {
     active = false;
     state = IDLE;
+    Serial.println("ScrewRoutine begun");
 }
 
 void ScrewRoutine::start() {

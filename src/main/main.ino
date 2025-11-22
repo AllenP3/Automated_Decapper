@@ -43,6 +43,8 @@ void setup() {
 
 void loop() {
     // Serial.print("reached loop");
+    Serial.print("JOY_SW=");
+    Serial.print(digitalRead(PIN_JOY_SW));
     ui.update();
     safety.update();
 

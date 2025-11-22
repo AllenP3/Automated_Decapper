@@ -13,7 +13,7 @@ UI_OLED::UI_OLED()
     snapCount = 0;
     screwCount = 0;
 
-    lastButtonTime = 0;
+    lastPressTime = 0;
     lastMoveTime = 0;
     lastAnimTick = 0;
     animBlink = false;
@@ -23,8 +23,10 @@ UI_OLED::UI_OLED()
 // INIT
 // =========================================================
 void UI_OLED::begin() {
-    pinMode(JOY_SW_PIN, INPUT_PULLUP);   // joystick button (active low)
-    pinMode(BTN_STOP,   INPUT_PULLUP);   // stop button
+    pinMode(PIN_BTN_START, INPUT);
+    digitalWrite(PIN_BTN_START, LOW); // disables pull-up
+        // joystick button (ACTIVE HIGH)
+    pinMode(BTN_STOP, INPUT_PULLUP);  // stop button (ACTIVE LOW)
 
     u8g2.begin();
     showScreen("DECAP UI", "Starting...");
@@ -66,32 +68,42 @@ bool UI_OLED::homingNeeded() const { return needsHoming; }
 // =========================================================
 // BUTTON HANDLING W/ DEBOUNCE
 // =========================================================
-bool UI_OLED::buttonPressed(int pin) {
-    static unsigned long lastPressStart = 0;
-    static unsigned long lastPressStop  = 0;
 
+bool UI_OLED::buttonPressed(int pin) {
+   
+    Serial.print("[BPF] checking pin ");
+    Serial.print(pin);
+    Serial.print(" raw=");
+    Serial.println(digitalRead(pin));
+
+
+    static unsigned long lastPressTime = 0;
     unsigned long now = millis();
 
+    bool pressed;
+
     if (pin == PIN_BTN_START) {
-        if (digitalRead(PIN_BTN_START) == LOW) {
-            if (now - lastPressStart > debounceMs) {
-                lastPressStart = now;
-                return true;
-            }
-        }
+        // joystick: ACTIVE HIGH
+        pressed = (digitalRead(PIN_BTN_START) == HIGH);
+        Serial.print("Button Start Pressed");
+    } 
+    else if (pin == PIN_BTN_STOP) {
+        // stop button: ACTIVE LOW
+        pressed = (digitalRead(PIN_BTN_STOP) == LOW);
+    } 
+    else {
+        return false;
     }
 
-    if (pin == PIN_BTN_STOP) {
-        if (digitalRead(PIN_BTN_STOP) == LOW) {
-            if (now - lastPressStop > debounceMs) {
-                lastPressStop = now;
-                return true;
-            }
-        }
+    if (pressed && (now - lastPressTime > debounceMs)) {
+        lastPressTime = now;
+        return true;
     }
 
     return false;
 }
+
+
 
 
 // =========================================================
@@ -111,6 +123,10 @@ int UI_OLED::smoothRead(int pin) {
 // =========================================================
 void UI_OLED::handleJoystickModeSwitch() {
     int x = smoothRead(JOY_X_PIN);
+     int xVal = smoothRead(JOY_X_PIN);
+
+    Serial.print("ModeSwitch X=");
+    Serial.println(xVal);
     unsigned long now = millis();
 
     if (now - lastMoveTime < 260) return;

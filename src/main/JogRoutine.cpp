@@ -7,49 +7,58 @@
 #include "ServoClaw.h"
 #include "Config.h"
 
-JogRoutine::JogRoutine(LinearActuator &linRef,
+JogRoutine::JogRoutine(UI_OLED &uiRef,
+                       LinearActuator &linRef,
                        RailStepper &railRef,
                        ClawStepper &clawRef,
                        ServoClaw &servoRef)
 {
+    ui = &uiRef;
     lin = &linRef;
     rail = &railRef;
     claw = &clawRef;
     servo = &servoRef;
 }
 
-void JogRoutine::run(UI_OLED &ui,
-                     LinearActuator &linear,
-                     RailStepper &rail,
-                     ClawStepper &claw,
-                     ServoClaw &servo)
+
+void JogRoutine::begin()
 {
-    ui.showMessage("JOG MODE", "Start/Stop to exit", 700);
+    finished = false;
+    ui->showMessage("JOG MODE", "Press to exit", 500);
+}
 
-    while (true) {
-
-        if (ui.startRequested() || ui.stopRequested()) {
-            ui.showMessage("JOG EXIT", "Homing Required", 800);
-            return;
-        }
-
-        int x = analogRead(JOY_X_PIN);
-        int y = analogRead(JOY_Y_PIN);
-
-        if (x < 400) {
-            claw.rotateSteps(-JOG_CLAW_SPEED_STEPS);
-        }
-        else if (x > 600) {
-            claw.rotateSteps(+JOG_CLAW_SPEED_STEPS);
-        }
-        else if (y < 400) {
-            rail.moveSteps(+1);
-        }
-        else if (y > 600) {
-            rail.moveSteps(-1);
-        }
-        else {
-            ui.showMessage("JOG MODE", "Idle", 60);
-        }
+void JogRoutine::update()
+{
+    // Exit condition
+    if (ui->startRequested() || ui->stopRequested()) {
+        ui->showMessage("JOG EXIT", "Homing Required", 800);
+        finished = true;
+        return;
     }
+
+    int x = analogRead(PIN_JOY_X);
+    int y = analogRead(PIN_JOY_Y);
+
+    // Claw rotation
+    if (x < 400) {
+        claw->rotateSteps(-JOG_CLAW_SPEED_STEPS);
+        return;
+    }
+    else if (x > 600) {
+        claw->rotateSteps(+JOG_CLAW_SPEED_STEPS);
+        return;
+    }
+
+    // Rail movement
+    if (y < 400) {
+        rail->moveSteps(+1);
+        return;
+    }
+    else if (y > 600) {
+        rail->moveSteps(-1);
+        return;
+    }
+
+    // Neutral (idle but non-blocking)
+    // do nothing
 }

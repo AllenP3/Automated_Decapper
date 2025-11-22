@@ -24,6 +24,7 @@ SnapLinkRoutine::SnapLinkRoutine(LinearActuator &linRef,
 void SnapLinkRoutine::begin() {
     state = IDLE;
     active = false;
+    Serial.println("SnapRoutine begun");
 }
 
 void SnapLinkRoutine::start() {

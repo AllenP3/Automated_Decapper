@@ -3,15 +3,24 @@
 #include "LinearActuator.h"
 #include "RailStepper.h"
 #include "ClawStepper.h"
-#include "Arduino.h"
+#include "Config.h"
 
-HomeRoutine::HomeRoutine(LinearActuator &linRef,
+HomeRoutine::HomeRoutine(UI_OLED &uiRef,
+                         LinearActuator &linRef,
                          RailStepper &railRef,
                          ClawStepper &clawRef)
 {
+    ui = &uiRef;
     lin = &linRef;
     rail = &railRef;
     claw = &clawRef;
+}
+
+
+void HomeRoutine::begin()
+{
+    finished = false;
+    state = START;
 }
 
 bool HomeRoutine::run(UI_OLED &ui,
@@ -19,21 +28,15 @@ bool HomeRoutine::run(UI_OLED &ui,
                       RailStepper &rail,
                       ClawStepper &claw)
 {
-    if (!ui.runPhase("HOME", "Linear Up", 1500))
-        return false;
-
+    if (!ui.runPhase("HOME", "Linear Up", 1500)) return false;
     linear.home();
     delay(200);
 
-    if (!ui.runPhase("HOME", "Rail to Limit", 1500))
-        return false;
-
+    if (!ui.runPhase("HOME", "Rail to Limit", 1500)) return false;
     rail.home();
     delay(200);
 
-    if (!ui.runPhase("HOME", "Claw Align", 1500))
-        return false;
-
+    if (!ui.runPhase("HOME", "Claw Align", 1500)) return false;
     claw.home();
     delay(200);
 
