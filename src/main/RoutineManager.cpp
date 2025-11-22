@@ -21,44 +21,43 @@ void RoutineManager::begin() {
 
 void RoutineManager::update() {
 
-    // ---------------- SAFETY OVERRIDE ----------------
-    if (safety.stopPressed()) {
+    // SAFETY OVERRIDE
+    if (safety.stopRequested()) {
         stopRoutine();
         ui.showMessage("STOPPED", "Emergency Stop");
         ui.requireHoming(true);
         return;
     }
 
-    // ---------------- HANDLE ACTIVE ROUTINE ----------------
+    // IF ROUTINE RUNNING
     if (activeRoutine) {
 
         activeRoutine->update();
 
         if (activeRoutine->isFinished()) {
+
             ui.showMessage("DONE", activeRoutine->getName(), 900);
+
             delete activeRoutine;
             activeRoutine = nullptr;
-
-            return;
         }
 
-        return; // no UI idle handling while routine running
+        return;
     }
 
-    // ---------------- WHEN IDLE: CHECK FOR START ----------------
+    // IDLE: check start
     if (ui.startRequested()) {
-        Mode m = ui.getMode();
 
         if (ui.homingRequired() &&
-            m != MODE_HOME &&
-            m != MODE_JOG &&
-            m != MODE_INFO)
+            ui.getMode() != MODE_HOME &&
+            ui.getMode() != MODE_JOG &&
+            ui.getMode() != MODE_INFO)
         {
-            ui.showMessage("HOMING REQUIRED", "Select HOME/JOG", 900);
+            ui.showMessage("HOMING REQUIRED", "Select HOME/JOG");
             return;
         }
 
-        startRoutine(m);
+        startRoutine(ui.getMode());
     }
 }
 
@@ -69,40 +68,39 @@ void RoutineManager::startRoutine(Mode mode) {
     switch (mode) {
 
         case MODE_SNAP:
-            activeRoutine = new SnapLinkRoutine(ui, lin, rail, claw, servo);
+            activeRoutine = new SnapLinkRoutine(lin, rail, claw, servo);
             break;
 
         case MODE_SCREW:
-            activeRoutine = new ScrewRoutine(ui, lin, rail, claw, servo);
+            activeRoutine = new ScrewRoutine(lin, rail, claw, servo);
             break;
 
         case MODE_HOME:
-            activeRoutine = new HomeRoutine(ui, lin, rail, claw, servo);
+            activeRoutine = new HomeRoutine(lin, rail, claw);
             break;
 
         case MODE_JOG:
-            activeRoutine = new JogRoutine(ui, lin, rail, claw, servo);
+            activeRoutine = new JogRoutine(lin, rail, claw, servo);
             break;
 
         case MODE_INFO:
-            ui.showInfoScreen();
-            break;
+            ui.showMessage("INFO", "No routine");
+            return;
 
         case MODE_CALIBRATE:
-            activeRoutine = new CalibrationRoutine(ui, lin, rail, claw, servo);
+            activeRoutine = new CalibrationRoutine(lin, rail, claw, servo);
             break;
 
         default:
-            ui.showMessage("INVALID MODE", "", 700);
-            break;
+            ui.showMessage("INVALID MODE", "");
+            return;
     }
 
-    if (activeRoutine) {
-        activeRoutine->begin();
-    }
+    activeRoutine->begin();
 }
 
 void RoutineManager::stopRoutine() {
+
     if (!activeRoutine) return;
 
     activeRoutine->stop();
@@ -110,8 +108,8 @@ void RoutineManager::stopRoutine() {
     activeRoutine = nullptr;
 
     lin.stop();
-    rail.moveTo(rail.getPosition());  // freeze
-    claw.rotateSteps(0);              // freeze
+    rail.moveTo(rail.getPosition());
+    claw.rotateSteps(0);
     servo.open();
 
     ui.requireHoming(true);

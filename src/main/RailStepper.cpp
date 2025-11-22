@@ -12,6 +12,11 @@ void RailStepper::begin() {
 
     currentPos = 0;
     targetPos  = 0;
+    homed = false;
+}
+
+bool RailStepper::limitTriggered() {
+    return digitalRead(PIN_RAIL_LIMIT) == LOW; // active LOW
 }
 
 bool RailStepper::isBusy() const {
@@ -21,41 +26,40 @@ bool RailStepper::isBusy() const {
 void RailStepper::update() {
     if (!isBusy()) return;
 
-    unsigned long now = millis();
-    if (now - lastStepTime < RAIL_STEP_DELAY_US / 1000) return;
+    // If we are moving backwards (negative direction) AND limit is hit → stop instantly
+    if (targetPos < currentPos && limitTriggered()) {
+        currentPos = 0;
+        targetPos = 0;
+        homed = true;
+        return;
+    }
+
+    unsigned long now = micros();
+    if (now - lastStepTime < RAIL_STEP_DELAY_US) return;
     lastStepTime = now;
 
     int dir = (targetPos > currentPos) ? 1 : -1;
-
     currentPos += dir;
     stepMotor(dir);
 }
 
-void RailStepper::moveTo(long steps) {
-    targetPos = steps;
+void RailStepper::moveTo(long pos) {
+    targetPos = pos;
 }
 
 void RailStepper::moveSteps(long rel) {
-    targetPos = currentPos + rel;
-}
-
-bool RailStepper::limitTriggered() {
-    if (RAIL_LIMIT_ACTIVE_LOW)
-        return digitalRead(PIN_RAIL_LIMIT) == LOW;
-    else
-        return digitalRead(PIN_RAIL_LIMIT) == HIGH;
+    moveTo(currentPos + rel);
 }
 
 void RailStepper::home() {
-    // move backwards until trigger
+    // drive backwards until limit triggers
     while (!limitTriggered()) {
         stepMotor(-1);
         delayMicroseconds(RAIL_STEP_DELAY_US);
     }
 
-    // zero reference
     currentPos = 0;
-    targetPos  = 0;
+    targetPos = 0;
     homed = true;
 }
 

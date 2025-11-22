@@ -2,13 +2,14 @@
 #define SNAPLINK_ROUTINE_H
 
 #include <Arduino.h>
+#include "BaseRoutine.h"
 #include "LinearActuator.h"
 #include "RailStepper.h"
 #include "ClawStepper.h"
 #include "ServoClaw.h"
 #include "Config.h"
 
-class SnapLinkRoutine {
+class SnapLinkRoutine : public BaseRoutine {
 public:
     enum State {
         IDLE,
@@ -20,13 +21,19 @@ public:
         DONE
     };
 
-    SnapLinkRoutine();
+    SnapLinkRoutine(LinearActuator &linRef,
+                    RailStepper &railRef,
+                    ClawStepper &clawRef,
+                    ServoClaw &servoRef);
 
-    void begin();
-    void start();
-    void update();
+    void begin() override;
+    void update() override;
+    void stop() override { active = false; }
 
-    bool isActive() const { return active; }
+    void start();   // <-- REQUIRED
+
+    bool isFinished() override { return !active; }
+    const char* getName() override { return "SNAP"; }
 
 private:
     State state;
@@ -34,7 +41,6 @@ private:
 
     unsigned long phaseStart;
 
-    // references provided at start()
     LinearActuator* lin;
     RailStepper* rail;
     ClawStepper* claw;

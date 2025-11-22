@@ -1,9 +1,22 @@
 #include "JogRoutine.h"
 #include "UI_OLED.h"
-#include "Arduino.h"
 
-// JOG mode uses joystick for manual motion.
-// Exits on START or STOP button.
+#include "LinearActuator.h"
+#include "RailStepper.h"
+#include "ClawStepper.h"
+#include "ServoClaw.h"
+#include "Config.h"
+
+JogRoutine::JogRoutine(LinearActuator &linRef,
+                       RailStepper &railRef,
+                       ClawStepper &clawRef,
+                       ServoClaw &servoRef)
+{
+    lin = &linRef;
+    rail = &railRef;
+    claw = &clawRef;
+    servo = &servoRef;
+}
 
 void JogRoutine::run(UI_OLED &ui,
                      LinearActuator &linear,
@@ -23,31 +36,20 @@ void JogRoutine::run(UI_OLED &ui,
         int x = analogRead(JOY_X_PIN);
         int y = analogRead(JOY_Y_PIN);
 
-        const int low = 400, high = 600;
-
-        if (x < low) {
-            // Rotate Claw - direction
-            claw.step(-1);
-            ui.showMessage("JOG", "Rotate -", 50);
+        if (x < 400) {
+            claw.rotateSteps(-JOG_CLAW_SPEED_STEPS);
         }
-        else if (x > high) {
-            // Rotate Claw + direction
-            claw.step(+1);
-            ui.showMessage("JOG", "Rotate +", 50);
+        else if (x > 600) {
+            claw.rotateSteps(+JOG_CLAW_SPEED_STEPS);
         }
-        else if (y < low) {
-            // Fine up/down for rail stepper?
-            rail.step(+1);
-            ui.showMessage("JOG", "Rail +", 50);
+        else if (y < 400) {
+            rail.moveSteps(+1);
         }
-        else if (y > high) {
-            rail.step(-1);
-            ui.showMessage("JOG", "Rail -", 50);
+        else if (y > 600) {
+            rail.moveSteps(-1);
         }
         else {
-            // idle update (draw idle UI in jog format)
-            ui.drawMessage("JOG MODE", "Idle");
-            delay(60);
+            ui.showMessage("JOG MODE", "Idle", 60);
         }
     }
 }

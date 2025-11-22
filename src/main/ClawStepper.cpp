@@ -1,39 +1,72 @@
-#include "CalibrationRoutine.h"
+#include "ClawStepper.h"
+#include <Arduino.h>
 
-void CalibrationRoutine::run(
-    UI_OLED &ui,
-    LinearActuator &lin,
-    RailStepper &rail,
-    ClawStepper &claw,
-    ServoClaw &servo
-) {
-    ui.showMessage("CALIBRATION", "Use joystick");
-    delay(800);
+ClawStepper::ClawStepper() {}
 
-    while (true) {
+void ClawStepper::begin() {
+    pinMode(CLAW_IN1, OUTPUT);
+    pinMode(CLAW_IN2, OUTPUT);
+    pinMode(CLAW_IN3, OUTPUT);
+    pinMode(CLAW_IN4, OUTPUT);
 
-        if (ui.stopRequested()) {
-            ui.showMessage("Cancelled", "No changes saved");
-            delay(800);
-            return;
-        }
+    pinMode(CLAW_HALL_PIN, INPUT_PULLUP);
 
-        if (ui.startRequested()) {
-            ui.showMessage("Saved", "Calibration done");
-            delay(800);
-            return;
-        }
+    currentStep = 0;
+    targetStep  = 0;
+    seqIndex = 0;
+    homed = false;
+}
 
-        int x = analogRead(PIN_JOY_X);
-        int y = analogRead(PIN_JOY_Y);
+void ClawStepper::update() {
+    if (currentStep == targetStep) return;
 
-        if (x < 400) claw.rotateSteps(-JOG_CLAW_SPEED_STEPS);
-        else if (x > 600) claw.rotateSteps(JOG_CLAW_SPEED_STEPS);
+    unsigned long now = micros();
+    if (now - lastStepTime < CLAW_STEP_DELAY_US) return;
 
-        if (y < 400) lin.moveSteps(JOG_LINEAR_SPEED_STEPS);
-        else if (y > 600) lin.moveSteps(-JOG_LINEAR_SPEED_STEPS);
+    lastStepTime = now;
 
-        if (digitalRead(PIN_JOY_SW) == LOW) servo.close();
-        else servo.open();
+    int dir = (targetStep > currentStep) ? 1 : -1;
+
+    stepOnce(dir);
+    currentStep += dir;
+}
+
+void ClawStepper::stepOnce(int dir) {
+    seqIndex = (seqIndex + dir) & 7;
+
+    digitalWrite(CLAW_IN1, seq[seqIndex][0]);
+    digitalWrite(CLAW_IN2, seq[seqIndex][1]);
+    digitalWrite(CLAW_IN3, seq[seqIndex][2]);
+    digitalWrite(CLAW_IN4, seq[seqIndex][3]);
+}
+
+void ClawStepper::rotateDegrees(float deg) {
+    long steps = deg / CLAW_DEGREES_PER_STEP;
+    moveToSteps(currentStep + steps);
+}
+
+void ClawStepper::rotateToDegrees(float deg) {
+    long steps = deg / CLAW_DEGREES_PER_STEP;
+    moveToSteps(steps);
+}
+
+void ClawStepper::rotateSteps(long steps) {
+    moveToSteps(currentStep + steps);
+}
+
+void ClawStepper::moveToSteps(long targetSteps) {
+    targetStep = targetSteps;
+}
+
+void ClawStepper::home() {
+
+    // Rotate until hall sensor is LOW (magnet present)
+    while (digitalRead(CLAW_HALL_PIN) == HIGH) {
+        stepOnce(-1);
+        delayMicroseconds(CLAW_STEP_DELAY_US);
     }
+
+    currentStep = 0;
+    targetStep  = 0;
+    homed = true;
 }

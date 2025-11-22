@@ -1,7 +1,24 @@
 #include "ScrewRoutine.h"
+#include "LinearActuator.h"
+#include "RailStepper.h"
+#include "ClawStepper.h"
+#include "ServoClaw.h"
+#include "Config.h"
 
-ScrewRoutine::ScrewRoutine()
-: state(IDLE), active(false) {}
+ScrewRoutine::ScrewRoutine(LinearActuator &linRef,
+                           RailStepper &railRef,
+                           ClawStepper &clawRef,
+                           ServoClaw &servoRef)
+{
+    lin = &linRef;
+    rail = &railRef;
+    claw = &clawRef;
+    servo = &servoRef;
+
+    active = false;
+    state = IDLE;
+}
+
 
 void ScrewRoutine::begin() {
     active = false;

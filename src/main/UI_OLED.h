@@ -40,6 +40,9 @@ public:
     // used by routines after completing
     void showMessage(const char* title, const char* subtitle, int delayMs = 800);
 
+    void requireHoming(bool v) { needsHoming = v; }
+    bool homingRequired() const { return needsHoming; }
+
 private:
     // drawing helpers
     void drawIdleScreen();

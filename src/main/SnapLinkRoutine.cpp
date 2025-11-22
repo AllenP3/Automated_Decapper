@@ -1,7 +1,25 @@
 #include "SnapLinkRoutine.h"
+#include "LinearActuator.h"
+#include "RailStepper.h"
+#include "ClawStepper.h"
+#include "ServoClaw.h"
+#include "Config.h"
 
-SnapLinkRoutine::SnapLinkRoutine()
-: state(IDLE), active(false) {}
+
+SnapLinkRoutine::SnapLinkRoutine(LinearActuator &linRef,
+                                 RailStepper &railRef,
+                                 ClawStepper &clawRef,
+                                 ServoClaw &servoRef)
+{
+    lin = &linRef;
+    rail = &railRef;
+    claw = &clawRef;
+    servo = &servoRef;
+
+    active = false;
+    state = IDLE;
+}
+
 
 void SnapLinkRoutine::begin() {
     state = IDLE;

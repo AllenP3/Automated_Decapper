@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include "UI_OLED.h"
 #include "Safety.h"
+
+#include "BaseRoutine.h"
 #include "SnapLinkRoutine.h"
 #include "ScrewRoutine.h"
 #include "HomeRoutine.h"
@@ -26,7 +28,7 @@ public:
                    ServoClaw &servoRef);
 
     void begin();
-    void update();                    // called every loop
+    void update();
 
 private:
     UI_OLED &ui;
@@ -37,7 +39,6 @@ private:
     ClawStepper &claw;
     ServoClaw &servo;
 
-    // Currently active routine pointer
     BaseRoutine *activeRoutine = nullptr;
 
     void startRoutine(Mode mode);

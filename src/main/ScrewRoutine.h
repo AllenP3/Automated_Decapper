@@ -2,13 +2,14 @@
 #define SCREW_ROUTINE_H
 
 #include <Arduino.h>
+#include "BaseRoutine.h"
 #include "LinearActuator.h"
 #include "RailStepper.h"
 #include "ClawStepper.h"
 #include "ServoClaw.h"
 #include "Config.h"
 
-class ScrewRoutine {
+class ScrewRoutine : public BaseRoutine {
 public:
     enum State {
         IDLE,
@@ -22,12 +23,19 @@ public:
         DONE
     };
 
-    ScrewRoutine();
+    ScrewRoutine(LinearActuator &linRef,
+                 RailStepper &railRef,
+                 ClawStepper &clawRef,
+                 ServoClaw &servoRef);
 
-    void begin();
-    void start();
-    void update();
-    bool isActive() const { return active; }
+    void begin() override;
+    void update() override;
+    void stop() override { active = false; }
+
+    void start();   // <-- REQUIRED
+
+    bool isFinished() override { return !active; }
+    const char* getName() override { return "SCREW"; }
 
 private:
     State state;
