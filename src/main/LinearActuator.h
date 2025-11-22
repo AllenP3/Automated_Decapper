@@ -1,28 +1,51 @@
-#pragma once
+#ifndef LINEAR_ACTUATOR_H
+#define LINEAR_ACTUATOR_H
+
 #include <Arduino.h>
+#include <AccelStepper.h>
+#include <TMCStepper.h>
+#include "Pins.h"
+#include "Config.h"
+
+// ---------------------------------------------------
+//  LinearActuator Class (TMC2209 + AccelStepper)
+// ---------------------------------------------------
+//  - Non-blocking step/dir motion
+//  - UART TMC2209 driver configuration
+//  - Homing with limit switch
+//  - mm-based movement
+//  - Slow-lift mode for unscrewing
+// ---------------------------------------------------
 
 class LinearActuator {
 public:
-  void init(uint8_t stepPin, uint8_t dirPin, uint8_t enPin);
+    LinearActuator();
 
-  void setSpeed(int microDelay);
-  void setStepsPerMM(float spmm);
+    void begin();
+    void update();             // MUST be called every loop
+    void stop();
 
-  void home();
-  void moveTo(float mm);
-  void moveRelative(float mm);
-  void stop();
+    // Motion
+    void moveToMM(float mm);
+    void moveSteps(long s);
+    void moveToSteps(long s);
 
-  float getPosition();
-  void setSoftLimits(float minMM, float maxMM);
+    // Homing
+    void home();
+    bool isHomed() const { return homed; }
+
+    // Status
+    bool isBusy() const { return (stepper.distanceToGo() != 0); }
 
 private:
-  void stepOnce(bool direction);
+    HardwareSerial &uart = Serial3;
+    TMC2209Stepper driver;
+    AccelStepper stepper;
 
-  uint8_t STEP, DIR, EN;
-  float positionMM = 0;
-  float stepsPerMM = 80;       // tune to your actuator
-  float minPos = 0;            // soft limits
-  float maxPos = 100;          // set in setup or calibration
-  int delayMicros = 1200;
+    bool homed = false;
+
+    // Polarity (can adjust later if needed)
+    bool limitActiveLow = true;
 };
+
+#endif

@@ -1,58 +1,73 @@
 #include "RailStepper.h"
 
-void RailStepper::init(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t limitPin) {
-  IN1=a; IN2=b; IN3=c; IN4=d;
-  LIMIT_PIN = limitPin;
+RailStepper::RailStepper() {}
 
-  pinMode(IN1,OUTPUT);
-  pinMode(IN2,OUTPUT);
-  pinMode(IN3,OUTPUT);
-  pinMode(IN4,OUTPUT);
-  pinMode(LIMIT_PIN, INPUT_PULLUP);
+void RailStepper::begin() {
+    pinMode(PIN_RAIL_IN1, OUTPUT);
+    pinMode(PIN_RAIL_IN2, OUTPUT);
+    pinMode(PIN_RAIL_IN3, OUTPUT);
+    pinMode(PIN_RAIL_IN4, OUTPUT);
+
+    pinMode(PIN_RAIL_LIMIT, INPUT_PULLUP);
+
+    currentPos = 0;
+    targetPos  = 0;
+    homed = false;
 }
 
-void RailStepper::setStepDelay(int ms) {
-  stepDelay = ms;
+bool RailStepper::limitTriggered() {
+    return digitalRead(PIN_RAIL_LIMIT) == LOW; // active LOW
 }
 
-void RailStepper::writeStep(int a, int b, int c, int d) {
-  digitalWrite(IN1,a);
-  digitalWrite(IN2,b);
-  digitalWrite(IN3,c);
-  digitalWrite(IN4,d);
+bool RailStepper::isBusy() const {
+    return currentPos != targetPos;
+}
+
+void RailStepper::update() {
+    if (!isBusy()) return;
+
+    // If we are moving backwards (negative direction) AND limit is hit → stop instantly
+    if (targetPos < currentPos && limitTriggered()) {
+        currentPos = 0;
+        targetPos = 0;
+        homed = true;
+        return;
+    }
+
+    unsigned long now = micros();
+    if (now - lastStepTime < RAIL_STEP_DELAY_US) return;
+    lastStepTime = now;
+
+    int dir = (targetPos > currentPos) ? 1 : -1;
+    currentPos += dir;
+    stepMotor(dir);
+}
+
+void RailStepper::moveTo(long pos) {
+    targetPos = pos;
+}
+
+void RailStepper::moveSteps(long rel) {
+    moveTo(currentPos + rel);
 }
 
 void RailStepper::home() {
-  Serial.println("[RailStepper] Homing...");
+    // drive backwards until limit triggers
+    while (!limitTriggered()) {
+        stepMotor(-1);
+        delayMicroseconds(RAIL_STEP_DELAY_US);
+    }
 
-  while (digitalRead(LIMIT_PIN) == HIGH) {
-    moveSteps(-1);
-  }
-
-  stop();
-  Serial.println("[RailStepper] Homed.");
+    currentPos = 0;
+    targetPos = 0;
+    homed = true;
 }
 
-void RailStepper::moveSteps(long steps) {
-  bool rev = (steps < 0);
-  steps = abs(steps);
+void RailStepper::stepMotor(int dir) {
+    seqIndex = (seqIndex + dir) & 7;
 
-  for (long i = 0; i < steps; i++) {
-    int idx = i % 8;
-    if (rev) idx = 7 - idx;
-
-    writeStep(seq[idx][0], seq[idx][1], seq[idx][2], seq[idx][3]);
-    delay(stepDelay);
-  }
-}
-
-void RailStepper::fastMoveSteps(long steps) {
-  int old = stepDelay;
-  stepDelay = 1;
-  moveSteps(steps);
-  stepDelay = old;
-}
-
-void RailStepper::stop() {
-  writeStep(0,0,0,0);
+    digitalWrite(PIN_RAIL_IN1, seq[seqIndex][0]);
+    digitalWrite(PIN_RAIL_IN2, seq[seqIndex][1]);
+    digitalWrite(PIN_RAIL_IN3, seq[seqIndex][2]);
+    digitalWrite(PIN_RAIL_IN4, seq[seqIndex][3]);
 }

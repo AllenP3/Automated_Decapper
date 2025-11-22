@@ -1,25 +1,47 @@
-#pragma once
+#ifndef RAIL_STEPPER_H
+#define RAIL_STEPPER_H
+
 #include <Arduino.h>
+#include "Pins.h"
+#include "Config.h"
 
 class RailStepper {
 public:
-  void init(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t limitPin);
+    RailStepper();
 
-  void home();
-  void moveSteps(long steps);
-  void fastMoveSteps(long steps);
-  void stop();
+    void begin();
+    void update();
 
-  void setStepDelay(int ms);
+    // Motion control
+    void moveTo(long positionSteps);      // absolute
+    void moveSteps(long relSteps);        // relative
+    bool isBusy() const;
+
+    // Homing
+    void home();
+    bool isHomed() const { return homed; }
+
+    long getPosition() const { return currentPos; }
 
 private:
-  void writeStep(int a, int b, int c, int d);
+    // Step sequence for 28BYJ-48
+    const uint8_t seq[8][4] = {
+        {1,0,0,0}, {1,1,0,0}, {0,1,0,0}, {0,1,1,0},
+        {0,0,1,0}, {0,0,1,1}, {0,0,0,1}, {1,0,0,1}
+    };
 
-  uint8_t IN1, IN2, IN3, IN4, LIMIT_PIN;
-  int stepDelay = 3;
+    long currentPos = 0;
+    long targetPos = 0;
 
-  int seq[8][4] = {
-    {1,0,0,0},{1,1,0,0},{0,1,0,0},{0,1,1,0},
-    {0,0,1,0},{0,0,1,1},{0,0,0,1},{1,0,0,1}
-  };
+    uint8_t seqIndex = 0;
+
+    unsigned long lastStepTime = 0;
+
+    bool homed = false;
+
+    void stepMotor(int dir);
+    bool limitTriggered();
+
 };
+
+#endif

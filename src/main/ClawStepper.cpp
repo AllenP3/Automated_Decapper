@@ -1,58 +1,72 @@
 #include "ClawStepper.h"
+#include <Arduino.h>
 
-void ClawStepper::init(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t hallPin) {
-  IN1=a; IN2=b; IN3=c; IN4=d;
-  HALL_PIN = hallPin;
+ClawStepper::ClawStepper() {}
 
-  pinMode(IN1,OUTPUT);
-  pinMode(IN2,OUTPUT);
-  pinMode(IN3,OUTPUT);
-  pinMode(IN4,OUTPUT);
-  pinMode(HALL_PIN, INPUT_PULLUP);
+void ClawStepper::begin() {
+    pinMode(CLAW_IN1, OUTPUT);
+    pinMode(CLAW_IN2, OUTPUT);
+    pinMode(CLAW_IN3, OUTPUT);
+    pinMode(CLAW_IN4, OUTPUT);
+
+    pinMode(CLAW_HALL_PIN, INPUT_PULLUP);
+
+    currentStep = 0;
+    targetStep  = 0;
+    seqIndex = 0;
+    homed = false;
 }
 
-void ClawStepper::setStepDelay(int ms) {
-  stepDelay = ms;
+void ClawStepper::update() {
+    if (currentStep == targetStep) return;
+
+    unsigned long now = micros();
+    if (now - lastStepTime < CLAW_STEP_DELAY_US) return;
+
+    lastStepTime = now;
+
+    int dir = (targetStep > currentStep) ? 1 : -1;
+
+    stepOnce(dir);
+    currentStep += dir;
 }
 
-void ClawStepper::writeStep(int a, int b, int c, int d) {
-  digitalWrite(IN1,a);
-  digitalWrite(IN2,b);
-  digitalWrite(IN3,c);
-  digitalWrite(IN4,d);
-}
+void ClawStepper::stepOnce(int dir) {
+    seqIndex = (seqIndex + dir) & 7;
 
-void ClawStepper::home() {
-  Serial.println("[ClawStepper] Homing...");
-
-  while (digitalRead(HALL_PIN) == HIGH) {
-    moveSteps(-1);
-  }
-
-  // Back off slightly
-  moveSteps(20);
-
-  Serial.println("[ClawStepper] Homing complete.");
-}
-
-void ClawStepper::moveSteps(long steps) {
-  bool rev = (steps < 0);
-  steps = abs(steps);
-
-  for (long i = 0; i < steps; i++) {
-    int idx = i % 8;
-    if (rev) idx = 7 - idx;
-
-    writeStep(seq[idx][0], seq[idx][1], seq[idx][2], seq[idx][3]);
-    delay(stepDelay);
-  }
+    digitalWrite(CLAW_IN1, seq[seqIndex][0]);
+    digitalWrite(CLAW_IN2, seq[seqIndex][1]);
+    digitalWrite(CLAW_IN3, seq[seqIndex][2]);
+    digitalWrite(CLAW_IN4, seq[seqIndex][3]);
 }
 
 void ClawStepper::rotateDegrees(float deg) {
-  long steps = deg / (degreesPerStep);
-  moveSteps(steps);
+    long steps = deg / CLAW_DEGREES_PER_STEP;
+    moveToSteps(currentStep + steps);
 }
 
-void ClawStepper::stop() {
-  writeStep(0,0,0,0);
+void ClawStepper::rotateToDegrees(float deg) {
+    long steps = deg / CLAW_DEGREES_PER_STEP;
+    moveToSteps(steps);
+}
+
+void ClawStepper::rotateSteps(long steps) {
+    moveToSteps(currentStep + steps);
+}
+
+void ClawStepper::moveToSteps(long targetSteps) {
+    targetStep = targetSteps;
+}
+
+void ClawStepper::home() {
+
+    // Rotate until hall sensor is LOW (magnet present)
+    while (digitalRead(CLAW_HALL_PIN) == HIGH) {
+        stepOnce(-1);
+        delayMicroseconds(CLAW_STEP_DELAY_US);
+    }
+
+    currentStep = 0;
+    targetStep  = 0;
+    homed = true;
 }

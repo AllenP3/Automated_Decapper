@@ -1,17 +1,38 @@
-#pragma once
+#ifndef SERVO_CLAW_H
+#define SERVO_CLAW_H
+
 #include <Arduino.h>
 #include <Servo.h>
+#include "Pins.h"
+#include "Config.h"
 
 class ServoClaw {
 public:
-  void init(uint8_t pwmPin);
+    ServoClaw();
 
-  void open(float deg);
-  void close(float deg);
+    void begin();
+    void update();
 
-  void slowMove(float start, float end, int speed);
+    // Actions
+    void open();
+    void close();
+    void closeStrong();
+    void setCustomTarget(int angle);
+
+    // Status
+    bool isBusy() const { return currentAngle != targetAngle; }
+    int  getAngle() const { return currentAngle; }
 
 private:
-  Servo servo;
-  uint8_t pin;
+    Servo servo;
+
+    int currentAngle = 90;
+    int targetAngle  = 90;
+
+    unsigned long lastStepTime = 0;
+
+    const int moveInterval = SERVO_STEP_INTERVAL_MS;   // from Config.h
+    const int stepSize     = SERVO_STEP_SIZE;          // angle increment per update
 };
+
+#endif
