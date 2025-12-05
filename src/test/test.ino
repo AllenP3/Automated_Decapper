@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // =======================================================
 // Continuous Parallel Motion (Final - Stepper1 = Rotation)
 // Servo + 2x 28BYJ + Linear Actuator (TMC2209)
@@ -103,4 +104,201 @@ void loop() {
 // ---------- Step driver ----------
 void stepSeq(int p[4], int idx){
   for (int i=0;i<4;i++) digitalWrite(p[i], seq[idx][i]);
+=======
+#include <TMCStepper.h>
+#include <AccelStepper.h>
+#include <Servo.h>
+
+// =====================================================
+// TMC2209 LINEAR ACTUATOR
+// =====================================================
+#define EN_PIN     10
+#define STEP_PIN   11
+#define DIR_PIN    12
+
+HardwareSerial & UART_PORT = Serial3;
+#define R_SENSE        0.11
+#define DRIVER_ADDRESS 0b00
+
+TMC2209Stepper driver(&UART_PORT, R_SENSE, DRIVER_ADDRESS);
+AccelStepper tmcStepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
+
+// =====================================================
+// JOYSTICK
+// =====================================================
+#define JOY_Y A0      // controls servo + stepper A + actuator
+#define JOY_X A1      // controls stepper B only
+int deadZone = 80;
+
+// =====================================================
+// SERVO
+// =====================================================
+Servo clawServo;
+#define SERVO_PIN 39
+int servoPos = 90;
+
+// =====================================================
+// 28BYJ #1 (Y-axis)
+// =====================================================
+#define IN1_A 31
+#define IN2_A 33
+#define IN3_A 35
+#define IN4_A 37
+
+// =====================================================
+// 28BYJ #2 (X-axis)
+// =====================================================
+#define IN1_B 23
+#define IN2_B 25
+#define IN3_B 27
+#define IN4_B 29
+
+// =====================================================
+// NON-BLOCKING TIMERS FOR 28BYJ
+// =====================================================
+unsigned long lastStepTimeA = 0;
+unsigned long lastStepTimeB = 0;
+const unsigned long stepInterval = 600;
+
+int seqIndexA = 0;
+int seqIndexB = 0;
+
+const int seq[8][4] = {
+  {1,0,0,0},
+  {1,1,0,0},
+  {0,1,0,0},
+  {0,1,1,0},
+  {0,0,1,0},
+  {0,0,1,1},
+  {0,0,0,1},
+  {1,0,0,1}
+};
+
+void applyStepA(int i) {
+  digitalWrite(IN1_A, seq[i][0]);
+  digitalWrite(IN2_A, seq[i][1]);
+  digitalWrite(IN3_A, seq[i][2]);
+  digitalWrite(IN4_A, seq[i][3]);
+}
+
+void applyStepB(int i) {
+  digitalWrite(IN1_B, seq[i][0]);
+  digitalWrite(IN2_B, seq[i][1]);
+  digitalWrite(IN3_B, seq[i][2]);
+  digitalWrite(IN4_B, seq[i][3]);
+}
+
+// =====================================================
+// SETUP
+// =====================================================
+void setup() {
+  Serial.begin(115200);
+
+  // TMC2209
+  pinMode(EN_PIN, OUTPUT);
+  digitalWrite(EN_PIN, LOW);
+
+  UART_PORT.begin(115200);
+  driver.begin();
+  driver.toff(5);
+  driver.rms_current(900);
+  driver.microsteps(8);
+  driver.pwm_autoscale(true);
+
+  tmcStepper.setMaxSpeed(8000);
+  tmcStepper.setAcceleration(2000);
+  tmcStepper.moveTo(10000);
+
+  // Servo
+  clawServo.attach(SERVO_PIN);
+
+  // 28BYJ pins
+  pinMode(IN1_A,OUTPUT); pinMode(IN2_A,OUTPUT);
+  pinMode(IN3_A,OUTPUT); pinMode(IN4_A,OUTPUT);
+
+  pinMode(IN1_B,OUTPUT); pinMode(IN2_B,OUTPUT);
+  pinMode(IN3_B,OUTPUT); pinMode(IN4_B,OUTPUT);
+
+  Serial.println("System Ready.");
+}
+
+// =====================================================
+// MAIN LOOP
+// =====================================================
+void loop() {
+
+  // =====================================================
+  // 1) LINEAR ACTUATOR BACKGROUND (TMC2209)
+  // =====================================================
+  tmcStepper.run();
+  if (tmcStepper.distanceToGo() == 0) {
+    long next = (tmcStepper.targetPosition() > 0) ? -10000 : 10000;
+    tmcStepper.moveTo(next);
+  }
+
+  // =====================================================
+  // 2) READ JOYSTICK
+  // =====================================================
+  int yRaw = analogRead(JOY_Y);
+  int xRaw = analogRead(JOY_X);
+
+  int yDiff = yRaw - 512;
+  int xDiff = xRaw - 512;
+
+  // Y-axis (servo + stepper A + actuator speed)
+  bool yForward  = (yDiff < -deadZone);
+  bool yBackward = (yDiff >  deadZone);
+
+  // X-axis (stepper B)
+  bool xForward  = (xDiff < -deadZone);
+  bool xBackward = (xDiff >  deadZone);
+
+  unsigned long now = micros();
+
+  // =====================================================
+  // 3) 28BYJ STEPPER A (Y-axis)
+  // =====================================================
+  if (yForward || yBackward) {
+    if (now - lastStepTimeA >= stepInterval) {
+      lastStepTimeA = now;
+
+      if (yForward)  seqIndexA = (seqIndexA + 1) % 8;
+      if (yBackward) seqIndexA = (seqIndexA - 1 + 8) % 8;
+
+      applyStepA(seqIndexA);
+    }
+  } else {
+    applyStepA(0);
+  }
+
+  // =====================================================
+  // 4) 28BYJ STEPPER B (X-axis)
+  // =====================================================
+  if (xForward || xBackward) {
+    if (now - lastStepTimeB >= stepInterval) {
+      lastStepTimeB = now;
+
+      if (xForward)  seqIndexB = (seqIndexB + 1) % 8;
+      if (xBackward) seqIndexB = (seqIndexB - 1 + 8) % 8;
+
+      applyStepB(seqIndexB);
+    }
+  } else {
+    applyStepB(0);
+  }
+
+  // =====================================================
+  // 5) SERVO (Y-axis only)
+  // =====================================================
+  if (yForward) {
+    servoPos++;
+    if (servoPos > 180) servoPos = 180;
+  }
+  else if (yBackward) {
+    servoPos--;
+    if (servoPos < 0) servoPos = 0;
+  }
+
+  clawServo.write(servoPos);
+>>>>>>> Stashed changes
 }
